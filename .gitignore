@@ -1,0 +1,9 @@
+# ignore data files
+# /Data
+# /associationMiningTraditional
+# /Output
+# /UnderstandScripts
+# /profile_results
+
+*~
+/other
