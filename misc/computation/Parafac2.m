@@ -51,7 +51,7 @@ while dSSE >= 1e-9*SSE_old && maxIter > iter;
     end
     
     dSSE=SSE_old-SSE;
-    %display(SSE)
+    display(SSE)
     %display(dSSE)
     
     SSE_old=SSE;
