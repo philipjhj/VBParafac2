@@ -1,7 +1,8 @@
 # ignore data files
 # /Data
 # /associationMiningTraditional
-# /Output
+/output
+/Notes
 # /UnderstandScripts
 # /profile_results
 

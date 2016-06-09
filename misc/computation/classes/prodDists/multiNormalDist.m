@@ -240,14 +240,18 @@ classdef multiNormalDist < probabilityDist
             else
                 K = 1;
             end
+            countneg = 0;
             value = 0;
             for i=1:I
                 for k=1:K
                     value = value+obj.arrayDim(2)/2*(1+log(2*pi))...
-                        +1/2*log(det(obj.variance(:,:,i,k)));
+                        +1/2*log(det((obj.variance(:,:,i,k))));
+%                     if log(det(obj.variance(:,:,i,k))) < 0
+%                         countneg = countneg+1;
+%                     end
                 end
             end
-            
+%             fprintf('%d / %d negative values',countneg,I*K)
         end
     end
 end

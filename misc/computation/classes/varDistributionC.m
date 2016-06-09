@@ -29,6 +29,7 @@ classdef varDistributionC < handle
         
         % Settings
         method='manopt' % Method used to approximate E(qP)
+        debugflag = 1
         activeParams = {'qA','qC','qF','qP','qSigma','qAlpha'}
     end
     
@@ -233,7 +234,7 @@ classdef varDistributionC < handle
             end
             
             value = obj.data.J/2*sum(obj.qSigma.entropy)-1/2*sum(obj.qSigma.meanGamma.*(...
-                sum(obj.eAiDFtPtPFDAi)+sum(obj.XInnerProduct)-2*t3));
+               sum(obj.eAiDFtPtPFDAi)+sum(obj.XInnerProduct)-2*t3));
         end
         
         function value = computeAqMeanLog(obj)
@@ -268,15 +269,19 @@ classdef varDistributionC < handle
         function updateMoments(obj)
             if ismember('qA',obj.activeParams)
                 obj.updateA;
+%                 check_variance_matrix(obj.qA.variance);
             end
             if ismember('qC',obj.activeParams)
                 obj.updateC;
+%                 check_variance_matrix(obj.qC.variance);
             end
             if ismember('qF',obj.activeParams)
                 obj.updateF;
+%                 check_variance_matrix(obj.qF.variance);
             end
             if ismember('qP',obj.activeParams)
                 obj.updateP;
+%                 check_variance_matrix(obj.qP.variance);
             end
             if ismember('qSigma',obj.activeParams)
                 obj.updateSigma;
@@ -290,15 +295,20 @@ classdef varDistributionC < handle
         % ### Variational Factor A
         function updateA(obj)
             
+            ELBO_prev = obj.ELBO;
             for i = 1:obj.data.I
                 obj.qA.variance(:,:,i) = inv(sum(multiplyTensor(obj.eDFtPtPFD,obj.qSigma.meanGamma),3)...
                     +eye(obj.data.M));
+                
                 sum_k=0;
                 for k = 1:obj.data.K
                     sum_k = sum_k + obj.qSigma.meanGamma(k)*obj.eD(:,:,k)*obj.eF'*obj.eP(:,:,k)'*obj.data.X(i,:,k)';
                 end
                 
+                check_ELBO(obj,ELBO_prev,obj.qA.varname,'variance',obj.debugflag)
+                ELBO_prev = obj.ELBO;
                 obj.qA.mean(i,:) = obj.qA.variance(:,:,i)*sum_k;
+                check_ELBO(obj,ELBO_prev,obj.qA.varname,'mean',obj.debugflag)
             end
             
         end
@@ -316,10 +326,11 @@ classdef varDistributionC < handle
         
         % ### Variational Factor F
         function updateF(obj)
+            for t = 1:1
             for m = 1:obj.data.M
                 t1 = 0;
                 for k = 1:obj.data.K
-                    t1 = t1+obj.qSigma.meanGamma(k)*obj.eCtC(:,:,k).*obj.qA.meanOuterProduct*obj.ePtPcond(m,m,k);
+                    t1 = t1+obj.qSigma.meanGamma(k)*obj.eCtC(:,:,k).*obj.qA.meanOuterProduct*obj.ePtP(m,m,k);
                 end
                 obj.qF.variance(:,:,m) = inv(t1+eye(obj.data.M));
                 
@@ -327,30 +338,42 @@ classdef varDistributionC < handle
             end
             
             for m = 1:obj.data.M
+                ELBO_prev = obj.ELBO;
                 allButM = 1:obj.data.M~=m;
                 tempMean = obj.qF.mean;
-                t1 = 0;
-                t2 = 0;
+                t1 = zeros(1,obj.data.M);
+                t2 = zeros(1,obj.data.M);
                 for k = 1:obj.data.K
+%                     if ~issymmetric(obj.eCtC(:,:,k).*obj.qA.meanOuterProduct)
+%                         disp('Error')
+%                         disp('Not symmetric') 
+%                     end
                     t1 = t1+obj.qSigma.meanGamma(k)*(obj.eCtC(:,:,k).*obj.qA.meanOuterProduct*...
-                        sum(repmat(obj.ePtPcond(m,allButM,k)',1,obj.data.M).*tempMean(allButM,:))')';
-                    %sum(repmat(obj.qP.meanInnerProductTransposed(m,allButM,k)',1,obj.data.M).*tempMean(allButM,:))')';
-                    %                         sum(repmat(obj.qP.mean(:,m,k)'*obj.qP.mean(:,allButM,k),numel(allButM),1)...
-                    %                         *tempMean(allButM,:))')';
+                        sum(repmat(obj.ePtP(m,allButM,k)',1,obj.data.M).*tempMean(allButM,:))')';
+                    
                     t2 = t2+obj.qSigma.meanGamma(k)*obj.qP.mean(:,m,k)'*obj.data.X(:,:,k)'*obj.qA.mean*obj.eD(:,:,k);
                 end
-                
-               % obj.qF.mean(:,m) = (-t1+t2)*obj.qF.variance(:,:,m);
+               check_ELBO(obj,ELBO_prev,obj.qF.varname,'variance',obj.debugflag) 
+               ELBO_prev = obj.ELBO;
+               obj.qF.mean(m,:) = (t2-t1)*obj.qF.variance(:,:,m);
+               check_ELBO(obj,ELBO_prev,obj.qF.varname,'mean',obj.debugflag)
+            end
+            
+            
+%             obj.qF.mean=matricizing(X,1)*(krprod(C,B)*((C'*C).*(B'*B))^(-1))
+            
+            
             end
         end
         % ### Variational Factor P
         function updateP(obj)
-            for k = 1:obj.data.K
-                for j = 1:obj.data.J
-                    obj.qP.variance(:,:,j,k) = inv(obj.qSigma.meanGamma(k)*(obj.qF.computeMeanInnerProductScaledSlabs(obj.eCtC(:,:,k).*obj.qA.meanOuterProduct))+eye(obj.data.M));
+            if ~strcmp(obj.method,'vonmises')
+                for k = 1:obj.data.K
+                    for j = 1:obj.data.J
+                      obj.qP.variance(:,:,j,k) = inv(obj.qSigma.meanGamma(k)*(obj.qF.computeMeanInnerProductScaledSlabs(obj.eCtC(:,:,k).*obj.qA.meanOuterProduct))+eye(obj.data.M));
+                    end
                 end
             end
-            
             obj.qPmean;
         end
         
@@ -371,7 +394,7 @@ classdef varDistributionC < handle
                     
                     % Constant terms in cost and grad function
                     gradconstant=(obj.qF.mean*obj.eD(:,:,k)*obj.qA.mean'*obj.data.X(:,:,k))';
-                    
+                    costconstant=obj.qF.mean*obj.eD(:,:,k)*obj.qA.mean'*obj.data.X(:,:,k);%*obj.qP.mean(:,:,k);
                     
                     cost = costFunc(obj.qP.mean(:,:,k));
                     
@@ -407,6 +430,13 @@ classdef varDistributionC < handle
                     obj.qPvonmisesEntropy = obj.qPvonmisesEntropy+H_Z;
                 end
                 %
+            elseif strcmp(obj.method,'parafac2svd')
+                for k = 1:obj.data.K
+                    [U,~,V] = svd(obj.qF.mean*obj.eD(:,:,k)*obj.qA.mean'*obj.data.X(:,:,k),'econ');
+                    
+                    obj.qP.mean(:,:,k) = V(:,1:obj.data.M)*U';
+                end
+            
             end
             
             
@@ -414,14 +444,14 @@ classdef varDistributionC < handle
                 % if ~isfield(store,'cost')
                 %                     disp(size(x))
                 %                     size(obj.qP.mean(:,:,k))
-                obj.qP.mean(:,:,k) = x;
+%                 obj.qP.mean(:,:,k) = x;
 %                 cost = -(obj.XqMeanLog+obj.PqMeanLog);
 %                 cost = -(-1/2*obj.qSigma.mean(k)*(sum(obj.eAiDFtPtPFDAi(:,k))-...
 %                     2*sum(sum(obj.data.X(:,:,k)*obj.qP.mean(:,:,k)*obj.qF.mean*obj.eD(:,:,k).*obj.qA.mean)))-1/2*...
 %                     trace(obj.qP.meanInnerProductMatrix(:,:,k)));
              
-                cost = -sum(sum(obj.data.X(:,:,k)*obj.qP.mean(:,:,k)*obj.qF.mean*obj.eD(:,:,k).*obj.qA.mean));
-                
+%                 cost = -sum(sum(obj.data.X(:,:,k)*x*obj.qF.mean*obj.eD(:,:,k).*obj.qA.mean));
+                cost = -trace(costconstant*x);
                 %   cost = -(t3cost+t4cost*(sum(obj.eAiDFtPtPFDAi(:,k))+t5cost-2*sum(sum(t1cost*obj.eP(:,:,k)*t2cost)))...
             %        +obj.PqMeanLog);
                 %end
@@ -457,11 +487,14 @@ classdef varDistributionC < handle
         % ### Variational Factor Sigma
         function updateSigma(obj)
             for k = 1:obj.data.K
-                obj.qSigma.alpha(k) = obj.data.J*obj.data.I/2+obj.pSigma.alpha(k);
-                obj.qSigma.beta(k) = 1/2*(sum(obj.eAiDFtPtPFDAi(:,k))+...
-                    2*obj.pSigma.beta(k)...
-                    +trace(obj.data.X(:,:,k)*obj.data.X(:,:,k)')...
-                    -2*sum(sum(obj.qA.mean*obj.eD(:,:,k)*obj.qF.mean'*obj.qP.mean(:,:,k)'.*obj.data.X(:,:,k))));
+                ELBO_prev = obj.ELBO;
+                obj.qSigma.alpha(k) = obj.pSigma.alpha(k)+obj.data.J*obj.data.I/2;
+%                 check_ELBO(obj,ELBO_prev,obj.qSigma.varname,'alpha') 
+                ELBO_prev = obj.ELBO;
+                obj.qSigma.beta(k) = obj.pSigma.beta(k)+1/(1/2*sum(obj.eAiDFtPtPFDAi(:,k))...
+                    +1/2*trace(obj.data.X(:,:,k)*obj.data.X(:,:,k)')...
+                    -sum(sum(obj.qA.mean*obj.eD(:,:,k)*obj.qF.mean'*obj.qP.mean(:,:,k)'.*obj.data.X(:,:,k))));
+%                 check_ELBO(obj,ELBO_prev,obj.qSigma.varname,'beta') 
             end
         end
         
@@ -469,7 +502,7 @@ classdef varDistributionC < handle
         function updateAlpha(obj)
             for m = 1:obj.data.M
                 obj.qAlpha.alpha(m) = obj.pAlpha.alpha(m)+1/2*obj.data.K;
-                obj.qAlpha.beta(m) = obj.pAlpha.beta(m)+1/2*sum(obj.eCsquared(:,m));
+                obj.qAlpha.beta(m) = 1/(obj.pAlpha.beta(m)+1/2*sum(obj.eCsquared(:,m)));
             end
         end
         
@@ -510,30 +543,36 @@ classdef varDistributionC < handle
         
         function value = get.ePtP(obj)
             if strcmp(obj.method,'vonmises')
-                value = obj.qP.meanOuterProduct;
+                value = repmat(eye(obj.data.M),1,1,obj.data.K);
             else
                 value = squeeze(sum(obj.qP.variance,3))+repmat(obj.data.J*eye(obj.data.M),1,1,obj.data.K);%repmat(eye(obj.data.M),1,1,obj.data.K);
             end
         end
         
         function value = get.ePtPcond(obj)
-            varCond = zeros(obj.data.K,obj.data.M);
-            for k=1:obj.data.K
-                for m = 1:obj.data.M
-                    for i=1:obj.data.I
-                        % Take the covariance matrix for i'th variable in k'th slab of P_i^k
-                        covSigma = obj.qP.variance(:,:,i,k);
-                        
-                        % calculate conditional covariance for m'th element of P_i^k given the rest
-                        varCond(k,m) = varCond(m) + covSigma(m,m) - covSigma(m,[1:(m-1) (m+1):end])*...
-                            inv(covSigma([1:(m-1) (m+1):end],[1:(m-1) (m+1):end]))*covSigma([1:(m-1) (m+1):end],m);
+            if strcmp(obj.method,'vonmises')
+                value = repmat(eye(obj.data.M),1,1,obj.data.K);
+            else
+                
+                varCond = zeros(obj.data.K,obj.data.M);
+                
+                for k=1:obj.data.K
+                    for m = 1:obj.data.M
+                        for i=1:obj.data.I
+                            % Take the covariance matrix for i'th variable in k'th slab of P_i^k
+                            covSigma = obj.qP.variance(:,:,i,k);
+                            
+                            % calculate conditional covariance for m'th element of P_i^k given the rest
+                            varCond(k,m) = varCond(m) + covSigma(m,m) - covSigma(m,[1:(m-1) (m+1):end])*...
+                                inv(covSigma([1:(m-1) (m+1):end],[1:(m-1) (m+1):end]))*covSigma([1:(m-1) (m+1):end],m);
+                        end
                     end
                 end
-            end
-            value = zeros(obj.data.M,obj.data.M,obj.data.K);
-            
-            for k = 1:obj.data.K
-                value(:,:,k) = obj.qP.mean(:,:,k)'*obj.qP.mean(:,:,k)+diag(varCond(k,:));
+                value = zeros(obj.data.M,obj.data.M,obj.data.K);
+                
+                for k = 1:obj.data.K
+                    value(:,:,k) = obj.qP.mean(:,:,k)'*obj.qP.mean(:,:,k)+diag(varCond(k,:));
+                end
             end
         end
                 
@@ -601,6 +640,44 @@ classdef varDistributionC < handle
         
     end
 end
+
+function check_variance_matrix(variance,debugflag)
+if debugflag
+I = size(variance,3);
+
+if ndims(variance)>3
+    K = size(variance,4);
+else
+    K = 1;
+end
+
+for k = 1:K
+    for i = 1:I
+        [~,p] = chol(variance(:,:,i,k));
+        if p
+            disp('error')
+            keyboard
+        end
+    end
+end
+end
+end
+
+function check_ELBO(obj,ELBO_prev,var,updatedparam,debugflag)
+
+if debugflag
+diff = obj.ELBO-ELBO_prev;
+
+if diff < -1e-6
+    disp(diff)
+    disp(var)
+    disp(updatedparam)
+%     keyboard
+end
+end
+end
+
+
 
 
 

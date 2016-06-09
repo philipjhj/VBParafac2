@@ -4,6 +4,9 @@ classdef varBayesModelParafac2 < handle
     properties
         % Variational Distribution
         qDist
+        
+        % Settings
+        verbose = 1; % 1, display, 0 hide everything
     end
     properties (Constant)
         data = dataClass;
@@ -13,12 +16,16 @@ classdef varBayesModelParafac2 < handle
         function obj = varBayesModelParafac2(X,M)
             % Summary of constructor
             
-            
+            rng(2)
             if nargin < 1
                 % Some dims to test
-                obj.data.M = 4;
-                obj.data.Mtrue=2;
-                obj.data.X = zeros([5 5 2]);
+                m = 5;
+                dim = 5;
+                k = 5;
+                obj.data.M = 1*m;
+                obj.data.Mtrue=1*m;
+                
+                obj.data.X = zeros([dim dim k]);
             else
                 obj.data.X = X;
                 obj.data.M = M;
@@ -41,6 +48,9 @@ classdef varBayesModelParafac2 < handle
             % Compute ELBO
             ELBO = obj.qDist.ELBO;
             ELBO_prev = 0;
+            
+            if obj.verbose
+            
             names = {'ELBO','ePxz','eQz','eX','eA','eC','eF','eP','eSigma','eAlpha','hA','hC','hF','hP','hSigma','hAlpha'};
             
             fprintf('%5s','Iter');
@@ -48,6 +58,7 @@ classdef varBayesModelParafac2 < handle
                 fprintf('%15s',names{i})
             end
             fprintf('\n') ;
+            end
             % Update Variational Factors until ELBO has converged
             iter = 0;
             
@@ -63,7 +74,9 @@ classdef varBayesModelParafac2 < handle
                 ELBO_prev = ELBO;
                 ELBO = obj.qDist.ELBO;
                 
+                
                 diff = ELBO-ELBO_prev;
+                if obj.verbose
                 if diff < -1e-6
                    fprintf('ELBO not converging; difference is %.4f \n',diff)
                    status=-1;
@@ -75,17 +88,18 @@ classdef varBayesModelParafac2 < handle
                 % ...
                 fprintf('%5d',iter);
                 obj.displayResultsAll;
-                
+                end
             end
             %fprintf('%5d',iter);
             %obj.displayResults;
                 
+            if obj.verbose
             fprintf('%5s','Iter');
             for i = 1:numel(names)
                 fprintf('%10s',names{i})
             end
             fprintf('\n');
-            
+            end
         end
         
         function displayResults(obj)

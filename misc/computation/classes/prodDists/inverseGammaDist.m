@@ -29,8 +29,8 @@ classdef inverseGammaDist < probabilityDist
         
         function value = get.meanGamma(obj)
             % Test if alpha, beta > 0
-%             value = obj.alpha.*obj.beta;
-            value = computeMean(obj);
+            value = obj.alpha.*obj.beta;
+%             value = computeMean(obj);
             %value = 1./obj.mean;
         end
         
@@ -55,8 +55,10 @@ classdef inverseGammaDist < probabilityDist
         
         function value = computeEntropy(obj)
             % Computes non constant terms of the entropy
-            value = sum(obj.alpha+log(obj.beta)+gammaln(obj.alpha)...
-                -(1+obj.alpha).*psi(obj.alpha));
+%             value = sum(obj.alpha+log(obj.beta)+gammaln(obj.alpha)...
+%                 -(1+obj.alpha).*psi(obj.alpha));
+              value = sum(obj.alpha+log(obj.beta)+gammaln(obj.alpha)...
+                  +(1-obj.alpha).*psi(obj.alpha));
         end
     end
 end
