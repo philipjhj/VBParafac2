@@ -2,6 +2,11 @@ classdef multiNormalDist < probabilityDist
     % Summary of help
     % description
     
+    properties
+        VarEqual
+    
+    end
+    
     properties (Dependent)
         meanOuterProduct
         meanOuterProductSingle
@@ -9,22 +14,26 @@ classdef multiNormalDist < probabilityDist
         meanInnerProductTransposed % E[X.X^T] (Constant value, if correct)
         meanInnerProductSumComponent
         distSquared
-%         meanInnerProductScaled
-        %meanInnerProductScaledVector
-        %meanInnerProductScaledMatrix
     end
     
     methods
-        function obj = multiNormalDist(varname,arrayDim)
+        function obj = multiNormalDist(varname,arrayDim,VarEqualBool)
             % Summary of constructor
             
             type = 'multiNormal';
             
+            if nargin < 3
+                VarEqualBool = false;
+            end
             
             if nargin < 2
                 arrayDim = 1;
             end
-            obj@probabilityDist(varname,type,arrayDim);
+            
+            obj@probabilityDist(varname,type,arrayDim,VarEqualBool);
+            
+            obj.VarEqual = VarEqualBool;
+            
         end
         
         function value = get.distSquared(obj)
@@ -33,8 +42,10 @@ classdef multiNormalDist < probabilityDist
         
         function value = get.meanInnerProductSumComponent(obj)    
 %                 value = sum(sum(sum(obj.distSquared)));
+
                   if ismatrix(obj.mean)
-                  value = trace(obj.mean*obj.mean')+trace(sum(obj.variance,3));
+%                   value = trace(obj.mean*obj.mean')+trace(sum(obj.variance,3));
+                  value = sum(sum(obj.mean.^2))+trace(sum(obj.variance,3));
                   else
                       value = 0;
                       for k = 1:obj.arrayDim(3)
@@ -73,7 +84,6 @@ classdef multiNormalDist < probabilityDist
             end
         end
         
-        %TODO fix below function
         function value = get.meanInnerProductTransposed(obj)
             
             % Covariance is square and symmetric
@@ -90,21 +100,24 @@ classdef multiNormalDist < probabilityDist
                     diag(diag(sum(obj.variance(:,:,:,k),3)));
                 end
             end
-%             varianceArray=cellfun(@diag,obj.variance,'UniformOutput',0);
-%             value = sum(cat(2,varianceArray{:})'+obj.mean.^2,1);
-            %    value = 1;
         end
         
-        
+        function updateStatistics(obj)
+           obj.computeEntropy;
+        end
     end
     
     % Functions with input from outside class
     methods (Access = public)
-        function matrixIPS = computeMeanInnerProductScaledSlabs(obj,A)
+        function matrixIPS = computeMeanInnerProductScaledSlabs(obj,A,diagFlag)
             % Computes the inner product <x'*A*x> scaled by A for all 
-            % vectors x
+            % vectors x or only diag of <x'*A*x> if diagFlag is set
             
-            I = obj.arrayDim(1);
+            if nargin < 3
+               diagFlag = 0; 
+            end
+            
+            I = obj.I;
             
             if numel(obj.arrayDim) == 2
                 K_dist = 1;
@@ -112,14 +125,20 @@ classdef multiNormalDist < probabilityDist
                 K_dist = obj.arrayDim(3);
             end
             
+            if diagFlag
+                matrixIPSsize = [I 1];
+            else
+                matrixIPSsize = [I I];
+            end
+                
             checkDimA = ndims(A);
             if checkDimA == 3 % Init for per slab in A
                 K_A = size(A,3);
-                matrixIPS = zeros(I,I,K_A);
+                matrixIPS = zeros([matrixIPSsize K_A]);
                 %[matrixIPS{:}] = deal(zeros(I,J));%,K_dist));
             else % Init for one slab A
                 K_A = 1;
-                matrixIPS = zeros(I,I,K_dist);
+                matrixIPS = zeros([matrixIPSsize K_dist]);
             end
             
             for k = 1:max(K_dist,K_A)
@@ -131,10 +150,13 @@ classdef multiNormalDist < probabilityDist
                 % either for same A for all slabs in the distribution matrix
                 % or k'th A for the k'th slab of the distribution
                 if checkDimA
-                    matrixIPS(:,:,k) = obj.computeMeanInnerProductScaled(1,A(:,:,k));
+                    matrixIPS(:,:,k) = obj.computeMeanInnerProductScaled(1,A(:,:,k),diagFlag);
                 else
-                    matrixIPS(:,:,k) = obj.computeMeanInnerProductScaled(k,A);
+                    matrixIPS(:,:,k) = obj.computeMeanInnerProductScaled(k,A,diagFlag);
                 end
+            end
+            if diagFlag
+                matrixIPS = squeeze(matrixIPS);
             end
         end
         
@@ -142,20 +164,7 @@ classdef multiNormalDist < probabilityDist
     
     % Functions not requiring input from outside the class
     methods (Access = protected)
-        
-        function value = computeMean(obj)
-            % Not implemented; returns identical obj
-            value = obj.mean;
-        end
-        
-        function value = computeVariance(obj)
-            % Not implemented; returns identical obj
-            value = obj.variance;
-        end
-        
-        
         function value = computeElementWiseSquared(obj)
-            %variance = cellfun(@diag,obj.qF.variance,'UniformOutput',false);
             
             value = zeros(obj.I,obj.J,obj.K);
             
@@ -207,7 +216,7 @@ classdef multiNormalDist < probabilityDist
             
         end
         
-        function meanIPS = computeMeanInnerProductScaled(obj,k_dist,A)
+        function meanIPS = computeMeanInnerProductScaled(obj,k_dist,A,diagFlag)
             % Computes <x'*A*y> for x == y
             % Computes <x'>*A*<y> for x ~= y
             % If A is not given, the identity matrix is applied
@@ -219,39 +228,66 @@ classdef multiNormalDist < probabilityDist
                 A = eye(size(obj.mean,2));
             end
             
+            if ~diagFlag
             meanIPS=obj.mean(:,:,k_dist)*A*obj.mean(:,:,k_dist)';
             
             % Add variance term to diagonal
-            for i=1:size(meanIPS,1)
-                covariance = obj.variance(:,:,i,k_dist);
-                meanIPS(i,i) = meanIPS(i,i)+trace(A*covariance);
+            if obj.VarEqual
+                meanIPS = meanIPS+...
+                    diag(ones(1,obj.I)*trace(A*obj.variance(:,:,1,k_dist)));
+            else
+                for i=1:size(meanIPS,1)
+                    covariance = obj.variance(:,:,i,k_dist);
+                    meanIPS(i,i) = meanIPS(i,i)+trace(A*covariance);
+                end
+            end
+            else
+                meanIPS = zeros(obj.I,1);
+                for i=1:obj.I
+                meanIPS(i) = obj.mean(i,:,k_dist)*A*obj.mean(i,:,k_dist)';
+                end
+                if obj.VarDim == 1
+                    meanIPS = bsxfun(@plus,meanIPS,trace(A*obj.variance(:,:,k_dist)));
+                    
+                else
+                    for i=1:size(meanIPS,1)
+                        covariance = obj.variance(:,:,i,k_dist);
+                        meanIPS(i) = meanIPS(i)+trace(A*covariance);
+                    end
+                    
+                end
+                
             end
         end
         
         
+        function computeMean(obj)
+            obj.mean;
+        end
         
-        function value = computeEntropy(obj)
+        function computeVariance(obj)
+             obj.variance;
+        end
+        
+        function computeEntropy(obj)
             % Computes non constant part of the entropy
-            % check for -Inf (=log(0))
-            %value = sum(sum(1/2*log(cellfun(@det,obj.variance))));
-            I = obj.arrayDim(1);
+            
             if ndims(obj.mean) == 3
-                K = obj.arrayDim(3);
+                K = obj.K;
             else
                 K = 1;
             end
-            countneg = 0;
+            
             value = 0;
-            for i=1:I
+            for i=1:obj.VarDim
                 for k=1:K
                     value = value+obj.arrayDim(2)/2*(1+log(2*pi))...
-                        +1/2*log(det((obj.variance(:,:,i,k))));
-%                     if log(det(obj.variance(:,:,i,k))) < 0
-%                         countneg = countneg+1;
-%                     end
+                        +1/2*logdet((obj.variance(:,:,i,k)));
+%                     value = value+log(sqrt(det(2*pi*obj.variance(:,:,i,k))))...
+%                         +obj.J/2;
                 end
             end
-%             fprintf('%d / %d negative values',countneg,I*K)
+            obj.entropy = value;
         end
     end
 end

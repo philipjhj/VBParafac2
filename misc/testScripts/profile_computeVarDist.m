@@ -3,19 +3,23 @@ profile on
 
 myModel = varBayesModelParafac2;
 
-myModel.computeVarDistribution
 
 
+myModel.qDist.debugflag = 0;
+myModel.verbose = 1;
+% myModel.qDist.method = 'vonmises';
+myModel.qDist.method = 'parafac2svd';
 
-%gibbs = gibbs;
+myModel.qDist.activeParams = {'qP','qF','qC','qA','qSigma','qAlpha'};
+
+myModel.computeVarDistribution;
 
 myprofile = profile('info');
 
-outdir='output/profiles/computeVarDist/'
-save(strcat(outdir,'test'),'myprofile')
 
-%end
+outdir=strcat('output/profiles/computeVarDist/',datestr(now),'_DIM',num2str(size(myModel.data.X),'_%d'),num2str(myModel.data.M,'_%d'));
+profsave(myprofile,outdir)
 
 % use profview(0,myprofile) to read results
-
-profview(0,myprofile)
+% 
+% profview(0,myprofile)

@@ -1,30 +1,27 @@
-classdef probabilityDist
+classdef probabilityDist < handle
     % Summary
     % Rows are independent distributions
     
     properties
         varname % Name of variable
-        type % Type of distribution
+        type    % Type of distribution
         
-        mean % First moment
-        variance % Second moment
+        mean
+        variance
+        entropy
     end
     properties (Access=protected)
         arrayDim % Dimensions of the distribution
         I
         J
         K
-    end
-    
-    properties (Dependent)
-        entropy % entropy
+        VarDim
     end
     
     
     methods
-        function obj = probabilityDist(varname,type,arrayDim)
+        function obj = probabilityDist(varname,type,arrayDim,VarEqualBool)
             % Summary of constructor
-            
             
             obj.varname=varname;
             obj.type=type;
@@ -40,16 +37,20 @@ classdef probabilityDist
             if strcmp(obj.type,'multiNormal')
                 obj.mean = rand(obj.arrayDim);
                 
-                %varIDX = obj.arrayDim([1 3:end]);
-                %if numel(varIDX) > 1
+                if VarEqualBool
+                    obj.VarDim = 1;
+                else
+                    obj.VarDim = obj.I;
+                end
+                
                 if ismatrix(obj.mean)
-                    obj.variance = zeros(obj.J,obj.J,obj.I);
-                    for i = 1:obj.I
+                    obj.variance = zeros(obj.J,obj.J,obj.VarDim);
+                    for i = 1:obj.VarDim
                         obj.variance(:,:,i) = eye(obj.J); % cov(obj.mean);
                     end
                 elseif numel(obj.arrayDim) == 3
-                    obj.variance = zeros(obj.J,obj.J,obj.I,obj.K);
-                    for i = 1:obj.I;
+                    obj.variance = zeros(obj.J,obj.J,obj.VarDim,obj.K);
+                    for i = 1:obj.VarDim;
                         for k = 1:obj.K;
                             obj.variance(:,:,i,k) =  eye(obj.J); % cov(obj.mean(:,:,k));
                         end
@@ -63,22 +64,14 @@ classdef probabilityDist
                 obj.variance = ones(obj.arrayDim);
             end
         end
-        
-        function value = get.entropy(obj)
-            % Compute entropy on demand
-            value = computeEntropy(obj);
-        end
-        
-        
-        
     end
     
     methods (Abstract, Access=protected)
         computeMean(obj) % To update Mean
         computeVariance(obj) % To update variance
         computeEntropy(obj) % To compute none constant terms of entropy
-        
-        %computeExpectedOuterProduct(obj)
-        %computeExpectedInnerProduct(obj)
+    end
+    methods (Abstract)
+        updateStatistics(obj)
     end
 end
