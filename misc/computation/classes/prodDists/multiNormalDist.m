@@ -49,7 +49,8 @@ classdef multiNormalDist < probabilityDist
                   else
                       value = 0;
                       for k = 1:obj.arrayDim(3)
-                         value = value+trace(obj.mean(:,:,k)*obj.mean(:,:,k)')+trace(sum(obj.variance(:,:,:,k),3)); 
+                         value = value+sum(sum(obj.mean(:,:,k).^2))+trace(sum(obj.variance(:,:,:,k),3)); 
+%                          value = value+trace(obj.mean(:,:,k)*obj.mean(:,:,k)')+trace(sum(obj.variance(:,:,:,k),3)); 
                       end
                   end
         end
@@ -242,10 +243,13 @@ classdef multiNormalDist < probabilityDist
                 end
             end
             else
-                meanIPS = zeros(obj.I,1);
-                for i=1:obj.I
-                meanIPS(i) = obj.mean(i,:,k_dist)*A*obj.mean(i,:,k_dist)';
-                end
+%                 meanIPS = zeros(obj.I,1);
+%                 for i=1:obj.I
+%                 meanIPS(i) = obj.mean(i,:,k_dist)*A*obj.mean(i,:,k_dist)';
+%                 end
+%                 
+                meanIPS = sum(obj.mean(:,:,k_dist)*A.*obj.mean(:,:,k_dist),2);
+                
                 if obj.VarDim == 1
                     meanIPS = bsxfun(@plus,meanIPS,trace(A*obj.variance(:,:,k_dist)));
                     

@@ -213,9 +213,17 @@ classdef varDistributionC < handle
         % Mean values for ELBO
         function computeqXMeanLog(obj)
             t3 = zeros(obj.data.I,obj.data.M,obj.data.K);
-            for k = 1:obj.data.K
-                t3(:,:,k) = obj.data.X(:,:,k)*obj.qP.mean(:,:,k)*obj.qF.mean*obj.eD(:,:,k);
-            end
+            
+            dataX = obj.data.X;
+            qPMean = obj.qP.mean;
+            qFMean = obj.qF.mean;
+            qDMean = obj.eD;
+            
+            %             for k = 1:obj.data.K
+            %                 t3(:,:,k) = dataX(:,:,k)*qPMean(:,:,k)*qFMean*qDMean(:,:,k);
+            %             end
+            
+            t3 = mtimesx(mtimesx(mtimesx(dataX,qPMean),qFMean),qDMean);
             
             t3sum = sum(sum(sum(multiplyTensor(t3,obj.qSigma.mean),3).*obj.qA.mean));
             
@@ -275,71 +283,118 @@ classdef varDistributionC < handle
         % ## Normal distributions
         % ### Variational Factor A
         function updateqA(obj)
-%             
-%             ELBO_prev = obj.ELBO;
+            %
+            %             ELBO_prev = obj.ELBO;
             obj.qA.variance = inv(sum(multiplyTensor(obj.eDFtPtPFD,obj.qSigma.mean),3)...
                 +eye(obj.data.M));
             
-            for i = 1:obj.data.I
-                
-                sum_k=0;
-                for k = 1:obj.data.K
-                    sum_k = sum_k + obj.qSigma.mean(k)*obj.eD(:,:,k)*obj.qF.mean'*obj.qP.mean(:,:,k)'*obj.data.X(i,:,k)';
-                end
-                
-%                 check_ELBO(obj,ELBO_prev,obj.qA.varname,'variance',obj.debugflag)
-%                 ELBO_prev = obj.ELBO;
-                obj.qA.mean(i,:) = (obj.qA.variance*sum_k)';
-%                 check_ELBO(obj,ELBO_prev,obj.qA.varname,'mean',obj.debugflag)
-            end
+            qSigmaMean = obj.qSigma.mean;
+            qD = obj.eD;
+            qFMeanT = obj.qF.mean';
+            qPMeanT = permute(obj.qP.mean,[2 1 3]);
+            dataXT = permute(obj.data.X,[2 1 3]);
+            
+            %             qAmean = obj.qA.mean;
+            qAvariance = obj.qA.variance;
+            
+            K = obj.data.K;
+            
+            %             for i = 1:obj.data.I
+            %
+            %                 sum_k=0;
+            %
+            %                 for k = 1:K
+            %                     sum_k = sum_k + qSigmaMean(k)*qD(:,:,k)*qFMeanT*qPMeanT(:,:,k)*dataXT(:,i,k);
+            %                 end
+            %
+            %
+            %
+            %                 qAmean(i,:) = (qAvariance*sum_k)';
+            %             end
+            
+            sum_k = sum(mtimesx(reshape(qSigmaMean,1,1,obj.data.K),mtimesx(mtimesx(mtimesx(qD,qFMeanT),qPMeanT),dataXT)),3);
+            obj.qA.mean = (qAvariance*sum_k)';
+            %             obj.qA.mean = qAmean;
             
         end
         
         % ### Variational Factor C
         function updateqC(obj)
-%             sum_k = 0;
+            %             sum_k = 0;
             for k = 1:obj.data.K
-                ELBO_prev = obj.ELBO;
+                %                 ELBO_prev = obj.ELBO;
                 obj.qC.variance(:,:,k) = inv(obj.qSigma.mean(k)*obj.qA.meanOuterProduct.*obj.eFtPtPF(:,:,k) + diag(obj.qAlpha.mean));
-%                 sum_k = sum_k+check_ELBO(obj,ELBO_prev,obj.qC.varname,'variance',obj.debugflag);
-%                 ELBO_prev = obj.ELBO;
+                %                 sum_k = sum_k+check_ELBO(obj,ELBO_prev,obj.qC.varname,'variance',obj.debugflag);
+                %                 ELBO_prev = obj.ELBO;
                 obj.qC.mean(k,:) = obj.qSigma.mean(k)*diag(obj.qF.mean'*obj.qP.mean(:,:,k)'*obj.data.X(:,:,k)'*obj.qA.mean)'*obj.qC.variance(:,:,k);
-%                 sum_k = sum_k+check_ELBO(obj,ELBO_prev,obj.qC.varname,'mean',obj.debugflag);
+                %                 sum_k = sum_k+check_ELBO(obj,ELBO_prev,obj.qC.varname,'mean',obj.debugflag);
             end
-%             disp(sum_k)
+            %             disp(sum_k)
         end
         
         % ### Variational Factor F
         function updateqF(obj)
-            for t = 1:1
-                for m = 1:obj.data.M
-                    t1 = 0;
-                    for k = 1:obj.data.K
-                        t1 = t1+obj.qSigma.mean(k)*obj.eCtC(:,:,k).*obj.qA.meanOuterProduct*obj.ePtP(m,m,k);
-                    end
-                    obj.qF.variance(:,:,m) = inv(t1+eye(obj.data.M));
-                    
-                    %
-                    %             end
-                    %
-                    %             for m = 1:obj.data.M
-                    ELBO_prev = obj.ELBO;
-                    allButM = 1:obj.data.M~=m;
-                    tempMean = obj.qF.mean;
-                    t1 = zeros(1,obj.data.M);
-                    t2 = zeros(1,obj.data.M);
-                    for k = 1:obj.data.K
-                        t1 = t1+obj.qSigma.mean(k)*(obj.eCtC(:,:,k).*obj.qA.meanOuterProduct*...
-                            sum(repmat(obj.ePtP(m,allButM,k)',1,obj.data.M).*tempMean(allButM,:),1)')';
-                        
-                        t2 = t2+obj.qSigma.mean(k)*obj.qP.mean(:,m,k)'*obj.data.X(:,:,k)'*obj.qA.mean*obj.eD(:,:,k);
-                    end
-                    check_ELBO(obj,ELBO_prev,obj.qF.varname,'variance',obj.debugflag);
-                    ELBO_prev = obj.ELBO;
-                    obj.qF.mean(m,:) = (t2-t1)*obj.qF.variance(:,:,m);
-                    check_ELBO(obj,ELBO_prev,obj.qF.varname,'mean',obj.debugflag);
-                end
+            %                 for m = 1:obj.data.M
+            %                     t1 = 0;
+            %                     for k = 1:obj.data.K
+            %                         t1 = t1+obj.qSigma.mean(k)*obj.eCtC(:,:,k).*obj.qA.meanOuterProduct*obj.ePtP(m,m,k);
+            %                     end
+            %
+            %
+            %
+            % %                     obj.qF.variance(:,:,m) = inv(t1+eye(obj.data.M));
+            %                 end
+            
+            p = obj.data.M;
+            n = obj.data.K;
+            
+            % Below code replaces a loop over m.
+            % the bsxfun as index for ePtP gets the diagonals
+            obj.qF.variance = multinv(squeeze(sum(bsxfun(@times,mtimesx(reshape(obj.qSigma.mean,1,1,obj.data.K),...
+                bsxfun(@times,obj.eCtC,obj.qA.meanOuterProduct)),...
+                reshape(obj.ePtP(bsxfun(@plus,[1:p+1:p*p]',[0:n-1]*p*p))',1,1,n,p)),3)));
+            
+            
+            
+            t2=squeeze(sum(mtimesx(reshape(obj.qSigma.mean,1,1,obj.data.K),...
+                mtimesx(permute(obj.qP.mean,[4 1 3 2]),...
+                mtimesx(permute(obj.data.X,[2 1 3]),...
+                mtimesx(obj.qA.mean,obj.eD)))),3));
+            
+            
+            for m = 1:obj.data.M
+                allButM = 1:obj.data.M~=m;
+                tempMean = obj.qF.mean;
+                
+                t1=sum(mtimesx(reshape(obj.qSigma.mean,1,1,obj.data.K),...
+                    mtimesx(bsxfun(@times,obj.eCtC,obj.qA.meanOuterProduct),...
+                    sum(bsxfun(@times,obj.ePtP(m,allButM,:),tempMean(allButM,:)'),2))),3)';
+                %                             sum(repmat(,1,obj.data.M).*,1)')';
+                
+                %                                     t2=sum(mtimesx(reshape(obj.qSigma.mean,1,1,2),...
+                %                                         mtimesx(permute(obj.qP.mean(:,m,:),[2 1 3]),...
+                %                                         mtimesx(permute(obj.data.X,[2 1 3]),...
+                %                                         mtimesx(obj.qA.mean,obj.eD)))),3);
+                
+                
+                obj.qF.mean(m,:) = (t2(:,m)'-t1)*obj.qF.variance(:,:,m);
             end
+            
+            
+            %                 for m = 1:obj.data.M
+            %                     allButM = 1:obj.data.M~=m;
+            %                     t1=squeeze(sum(mtimesx(reshape(obj.qSigma.mean,1,1,2),...
+            %                         mtimesx(bsxfun(@times,obj.eCtC,obj.qA.meanOuterProduct),...
+            %                         sum(bsxfun(@times,permute(obj.ePtP(:,allButM,:),[4 2 3 1]),tempMean(allButM,:)'),2))),3));
+            %
+            %                     t2=squeeze(sum(mtimesx(reshape(obj.qSigma.mean,1,1,2),...
+            %                         mtimesx(permute(obj.qP.mean,[4 1 3 2]),...
+            %                         mtimesx(permute(obj.data.X,[2 1 3]),...
+            %                         mtimesx(obj.qA.mean,obj.eD)))),3));
+            %
+            %                     obj.qF.mean = squeeze(mtimesx(reshape(t2-t1,1,obj.data.M,obj.data.M),obj.qF.variance))';
+            %                 end
+            
         end
         % ### Variational Factor P
         function updateqP(obj)
@@ -372,10 +427,10 @@ classdef varDistributionC < handle
                     gradconstant=(obj.qF.mean*obj.eD(:,:,k)*obj.qA.mean'*obj.data.X(:,:,k))';
                     costconstant=obj.qF.mean*obj.eD(:,:,k)*obj.qA.mean'*obj.data.X(:,:,k);%*obj.qP.mean(:,:,k);
                     
-                    cost = costFunc(obj.qP.mean(:,:,k));
+                    %                     cost = costFunc(obj.qP.mean(:,:,k));
                     
                     
-                    [x,xcost] = trustregions(problem,[],options);
+                    [x,~] = trustregions(problem,[],options);
                     %                     fprintf('\n Slab %d with cost diff: %.2f \n',k,cost-xcost)
                     obj.qP.mean(:,:,k) = x;
                     
@@ -422,11 +477,18 @@ classdef varDistributionC < handle
                 obj.qSigma.alpha(k) = obj.pSigma.alpha(k)+obj.data.J*obj.data.I/2;
                 %                 check_ELBO(obj,ELBO_prev,obj.qSigma.varname,'alpha')
                 %ELBO_prev = obj.ELBO;
-                obj.qSigma.beta(k) = obj.pSigma.beta(k)+1/(1/2*sum(obj.eAiDFtPtPFDAi(:,k))...
-                    +1/2*sum(obj.XInnerProduct)...
-                    -sum(sum(obj.qA.mean*obj.eD(:,:,k)*obj.qF.mean'*obj.qP.mean(:,:,k)'.*obj.data.X(:,:,k))));
+%                 obj.qSigma.beta(k) = obj.pSigma.beta(k)+1/(1/2*sum(obj.eAiDFtPtPFDAi(:,k))...
+%                     +1/2*sum(obj.XInnerProduct)...
+%                     -sum(sum(obj.qA.mean*obj.eD(:,:,k)*obj.qF.mean'*obj.qP.mean(:,:,k)'.*obj.data.X(:,:,k))));
                 %                 check_ELBO(obj,ELBO_prev,obj.qSigma.varname,'beta')
             end
+            obj.qSigma.beta = obj.pSigma.beta+1./(1/2*sum(obj.eAiDFtPtPFDAi,1)...
+                    +1/2*sum(obj.XInnerProduct)...
+                    -squeeze(sum(sum(...
+                    bsxfun(@times,...
+                    mtimesx(obj.qA.mean,mtimesx(obj.eD,mtimesx(obj.qF.mean',permute(obj.qP.mean,[2 1 3]))))...
+                    ,obj.data.X),1),2))');
+%                     -mtimesx(obj.qA.mean,mtimesx(obj.eD,mtimesx(obj.qF.mean',mtimesx(obj.qP.mean',obj.data.X')))));
         end
         
         % ### Variational Factor Alpha
@@ -467,17 +529,25 @@ classdef varDistributionC < handle
         function compute_eFtPtPF(obj)
             % For all components
             value = zeros(obj.data.M,obj.data.M,obj.data.K);
+            qFmeanT=obj.qF.mean';
+            qFmean = obj.qF.mean;
+            qFvariance = obj.qF.variance;
+            
+            ePtP = obj.ePtP; %#ok<PROP>
+            
+            M = obj.data.M;
+            
             for k = 1:obj.data.K
-                cVar = obj.ePtP(:,:,k);
-                for m = 1:obj.data.M
-                    for n = 1:obj.data.M
+                cVar = ePtP(:,:,k); %#ok<PROP>
+                for m = 1:M
+                    for n = 1:M
                         if cVar(m,n) ~= 0
                             if m == n
-                                value(:,:,k) = value(:,:,k)+cVar(m,n)*(obj.qF.mean(m,:)'...
-                                    *obj.qF.mean(m,:)+obj.qF.variance(:,:,m));
+                                value(:,:,k) = value(:,:,k)+cVar(m,n)*(qFmeanT(:,m)...
+                                    *qFmean(m,:)+qFvariance(:,:,m));
                             else
-                                value(:,:,k) = value(:,:,k)+cVar(m,n)*(obj.qF.mean(m,:)'...
-                                    *obj.qF.mean(n,:));
+                                value(:,:,k) = value(:,:,k)+cVar(m,n)*(qFmeanT(:,m)...
+                                    *qFmean(n,:));
                             end
                         end
                     end
@@ -499,21 +569,21 @@ classdef varDistributionC < handle
         end
         
         function compute_eAiDFtPtPFDAi(obj)
-%             expected = obj.qA.computeMeanInnerProductScaledSlabs(obj.eDFtPtPFD);
-%             value = zeros(obj.data.I,obj.data.K);
-%             for k = 1:obj.data.K
-%                 value(:,k) = diag(expected(:,:,k));
-%             end
+            %             expected = obj.qA.computeMeanInnerProductScaledSlabs(obj.eDFtPtPFD);
+            %             value = zeros(obj.data.I,obj.data.K);
+            %             for k = 1:obj.data.K
+            %                 value(:,k) = diag(expected(:,:,k));
+            %             end
             obj.eAiDFtPtPFDAi = obj.qA.computeMeanInnerProductScaledSlabs(obj.eDFtPtPFD,1);
         end
         
         function value = computeXInnerProduct(obj)
             value = zeros(1,obj.data.K);
-%             for i = 1:obj.data.I
-                for k = 1:obj.data.K
-                    value(k) = sum(sum(obj.data.X(:,:,k).^2));
-                end
-%             end
+            %             for i = 1:obj.data.I
+            for k = 1:obj.data.K
+                value(k) = sum(sum(obj.data.X(:,:,k).^2));
+            end
+            %             end
         end
         
         % #################################################################
@@ -529,30 +599,30 @@ classdef varDistributionC < handle
     end
 end
 
-function check_variance_matrix(variance,debugflag)
-if debugflag
-    I = size(variance,3);
-    
-    if ndims(variance)>3
-        K = size(variance,4);
-    else
-        K = 1;
-    end
-    
-    for k = 1:K
-        for i = 1:I
-            [~,p] = chol(variance(:,:,i,k));
-            if p
-                disp('error')
-                keyboard
-            end
-        end
-    end
-end
-end
+% function check_variance_matrix(variance,debugflag)
+% if debugflag
+%     I = size(variance,3);
+%
+%     if ndims(variance)>3
+%         K = size(variance,4);
+%     else
+%         K = 1;
+%     end
+%
+%     for k = 1:K
+%         for i = 1:I
+%             [~,p] = chol(variance(:,:,i,k));
+%             if p
+%                 disp('error')
+%                 keyboard
+%             end
+%         end
+%     end
+% end
+% end
 
 function val = check_ELBO(obj,ELBO_prev,var,updatedparam,debugflag)
-    val = 0;
+val = 0;
 if debugflag
     
     if strcmp(updatedparam,'qP')

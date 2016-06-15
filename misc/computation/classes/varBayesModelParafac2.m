@@ -9,6 +9,7 @@ classdef varBayesModelParafac2 < handle
         
         % Settings
         verbose = 1; % 1, display, 0 hide everything
+        maxiter = 5;
     end
     properties (Constant)
         data = dataClass;
@@ -18,14 +19,14 @@ classdef varBayesModelParafac2 < handle
         function obj = varBayesModelParafac2(X,M)
             % Summary of constructor
             
-%             rng(2)
+            rng(2)
             if nargin < 1
                 % Some dims to test
-                m = 2;
-                dim = 10;
-                k = 10;
-                obj.data.M = 4*m;
-                obj.data.Mtrue=2*m;
+                m = 15;
+                dim = 5000;
+                k = 2;
+                obj.data.M = m;
+                obj.data.Mtrue= m;
                 
                 obj.data.X = zeros([dim dim k]);
             else
@@ -65,7 +66,7 @@ classdef varBayesModelParafac2 < handle
             obj.iter = 0;
             
             diff = ELBO-ELBO_prev;
-            while abs(diff)/abs(ELBO) > 1e-9
+            while abs(diff)/abs(ELBO) > 1e-9 && obj.maxiter > obj.iter
                 
                 
                 % Update all variational factors
