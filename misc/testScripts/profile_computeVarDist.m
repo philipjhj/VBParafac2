@@ -17,7 +17,16 @@ myModel.computeVarDistribution;
 myprofile = profile('info');
 
 
-outdir=strcat('output/profiles/computeVarDist/',datestr(now),'_DIM',num2str(size(myModel.data.X),'_%d'),num2str(myModel.data.M,'_%d'));
+p = gcp('nocreate'); % If no pool, do not create new one.
+if isempty(p)
+    poolsize = 1;
+else
+    poolsize = p.NumWorkers;
+end
+
+outdir=strcat('output/profiles/computeVarDist/',datestr(now),...
+    '_DIM',num2str(size(myModel.data.X),'_%d'),num2str(myModel.data.M,'_%d'),...
+    '_nWorkers_',num2str(poolsize));
 profsave(myprofile,outdir)
 
 % use profview(0,myprofile) to read results

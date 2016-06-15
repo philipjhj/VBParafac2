@@ -213,8 +213,14 @@ classdef varDistributionC < handle
         % Mean values for ELBO
         function computeqXMeanLog(obj)
             t3 = zeros(obj.data.I,obj.data.M,obj.data.K);
-            for k = 1:obj.data.K
-                t3(:,:,k) = obj.data.X(:,:,k)*obj.qP.mean(:,:,k)*obj.qF.mean*obj.eD(:,:,k);
+            
+            dataX = obj.data.X;
+            qPMean = obj.qP.mean;
+            qFMean = obj.qF.mean;
+            qDMean = obj.eD;
+            
+            parfor k = 1:obj.data.K
+                t3(:,:,k) = dataX(:,:,k)*qPMean(:,:,k)*qFMean*qDMean(:,:,k);
             end
             
             t3sum = sum(sum(sum(multiplyTensor(t3,obj.qSigma.mean),3).*obj.qA.mean));
@@ -280,18 +286,29 @@ classdef varDistributionC < handle
             obj.qA.variance = inv(sum(multiplyTensor(obj.eDFtPtPFD,obj.qSigma.mean),3)...
                 +eye(obj.data.M));
             
+            qSigmaMean = obj.qSigma.mean;
+            qD = obj.eD;
+            qFMeanT = obj.qF.mean';
+            qPMeanT = permute(obj.qP.mean,[2 1 3]);
+            dataXT = permute(obj.data.X,[2 1 3]);
+            
+            qAmean = obj.qA.mean;
+            qAvariance = obj.qA.variance;
+            
+            K = obj.data.K;
+            
             for i = 1:obj.data.I
                 
                 sum_k=0;
-                for k = 1:obj.data.K
-                    sum_k = sum_k + obj.qSigma.mean(k)*obj.eD(:,:,k)*obj.qF.mean'*obj.qP.mean(:,:,k)'*obj.data.X(i,:,k)';
+                
+                for k = 1:K
+                    sum_k = sum_k + qSigmaMean(k)*qD(:,:,k)*qFMeanT*qPMeanT(:,:,k)*dataXT(:,i,k);
                 end
                 
-%                 check_ELBO(obj,ELBO_prev,obj.qA.varname,'variance',obj.debugflag)
-%                 ELBO_prev = obj.ELBO;
-                obj.qA.mean(i,:) = (obj.qA.variance*sum_k)';
-%                 check_ELBO(obj,ELBO_prev,obj.qA.varname,'mean',obj.debugflag)
+                qAmean(i,:) = (qAvariance*sum_k)';
             end
+            
+            obj.qA.mean = qAmean;
             
         end
         
@@ -299,7 +316,7 @@ classdef varDistributionC < handle
         function updateqC(obj)
 %             sum_k = 0;
             for k = 1:obj.data.K
-                ELBO_prev = obj.ELBO;
+%                 ELBO_prev = obj.ELBO;
                 obj.qC.variance(:,:,k) = inv(obj.qSigma.mean(k)*obj.qA.meanOuterProduct.*obj.eFtPtPF(:,:,k) + diag(obj.qAlpha.mean));
 %                 sum_k = sum_k+check_ELBO(obj,ELBO_prev,obj.qC.varname,'variance',obj.debugflag);
 %                 ELBO_prev = obj.ELBO;
@@ -372,10 +389,10 @@ classdef varDistributionC < handle
                     gradconstant=(obj.qF.mean*obj.eD(:,:,k)*obj.qA.mean'*obj.data.X(:,:,k))';
                     costconstant=obj.qF.mean*obj.eD(:,:,k)*obj.qA.mean'*obj.data.X(:,:,k);%*obj.qP.mean(:,:,k);
                     
-                    cost = costFunc(obj.qP.mean(:,:,k));
+%                     cost = costFunc(obj.qP.mean(:,:,k));
                     
                     
-                    [x,xcost] = trustregions(problem,[],options);
+                    [x,~] = trustregions(problem,[],options);
                     %                     fprintf('\n Slab %d with cost diff: %.2f \n',k,cost-xcost)
                     obj.qP.mean(:,:,k) = x;
                     
@@ -467,17 +484,25 @@ classdef varDistributionC < handle
         function compute_eFtPtPF(obj)
             % For all components
             value = zeros(obj.data.M,obj.data.M,obj.data.K);
+            qFmeanT=obj.qF.mean';
+            qFmean = obj.qF.mean;
+            qFvariance = obj.qF.variance;
+            
+            ePtP = obj.ePtP; %#ok<PROP>
+            
+            M = obj.data.M;
+            
             for k = 1:obj.data.K
-                cVar = obj.ePtP(:,:,k);
-                for m = 1:obj.data.M
-                    for n = 1:obj.data.M
+                cVar = ePtP(:,:,k); %#ok<PROP>
+                for m = 1:M
+                    for n = 1:M
                         if cVar(m,n) ~= 0
                             if m == n
-                                value(:,:,k) = value(:,:,k)+cVar(m,n)*(obj.qF.mean(m,:)'...
-                                    *obj.qF.mean(m,:)+obj.qF.variance(:,:,m));
+                                value(:,:,k) = value(:,:,k)+cVar(m,n)*(qFmeanT(:,m)...
+                                    *qFmean(m,:)+qFvariance(:,:,m));
                             else
-                                value(:,:,k) = value(:,:,k)+cVar(m,n)*(obj.qF.mean(m,:)'...
-                                    *obj.qF.mean(n,:));
+                                value(:,:,k) = value(:,:,k)+cVar(m,n)*(qFmeanT(:,m)...
+                                    *qFmean(n,:));
                             end
                         end
                     end
@@ -529,27 +554,27 @@ classdef varDistributionC < handle
     end
 end
 
-function check_variance_matrix(variance,debugflag)
-if debugflag
-    I = size(variance,3);
-    
-    if ndims(variance)>3
-        K = size(variance,4);
-    else
-        K = 1;
-    end
-    
-    for k = 1:K
-        for i = 1:I
-            [~,p] = chol(variance(:,:,i,k));
-            if p
-                disp('error')
-                keyboard
-            end
-        end
-    end
-end
-end
+% function check_variance_matrix(variance,debugflag)
+% if debugflag
+%     I = size(variance,3);
+%     
+%     if ndims(variance)>3
+%         K = size(variance,4);
+%     else
+%         K = 1;
+%     end
+%     
+%     for k = 1:K
+%         for i = 1:I
+%             [~,p] = chol(variance(:,:,i,k));
+%             if p
+%                 disp('error')
+%                 keyboard
+%             end
+%         end
+%     end
+% end
+% end
 
 function val = check_ELBO(obj,ELBO_prev,var,updatedparam,debugflag)
     val = 0;

@@ -49,7 +49,8 @@ classdef multiNormalDist < probabilityDist
                   else
                       value = 0;
                       for k = 1:obj.arrayDim(3)
-                         value = value+trace(obj.mean(:,:,k)*obj.mean(:,:,k)')+trace(sum(obj.variance(:,:,:,k),3)); 
+                         value = value+sum(sum(obj.mean(:,:,k).^2))+trace(sum(obj.variance(:,:,:,k),3)); 
+%                          value = value+trace(obj.mean(:,:,k)*obj.mean(:,:,k)')+trace(sum(obj.variance(:,:,:,k),3)); 
                       end
                   end
         end
