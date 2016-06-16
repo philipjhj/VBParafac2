@@ -9,7 +9,7 @@ classdef varBayesModelParafac2 < handle
         
         % Settings
         verbose = 1; % 1, display, 0 hide everything
-        maxiter = 5;
+        maxiter = 500;%intmax;
     end
     properties (Constant)
         data = dataClass;
@@ -19,12 +19,12 @@ classdef varBayesModelParafac2 < handle
         function obj = varBayesModelParafac2(X,M)
             % Summary of constructor
             
-            rng(2)
+            rng(4)
             if nargin < 1
                 % Some dims to test
-                m = 15;
-                dim = 5000;
-                k = 2;
+                m = 2;
+                dim = 2;
+                k = 5;
                 obj.data.M = m;
                 obj.data.Mtrue= m;
                 
