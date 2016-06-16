@@ -2,11 +2,14 @@ classdef varBayesModelParafac2 < handle
     
     
     properties
+        ELBO_chain
+        iter
         % Variational Distribution
         qDist
         
         % Settings
         verbose = 1; % 1, display, 0 hide everything
+        maxiter = 500;%intmax;
     end
     properties (Constant)
         data = dataClass;
@@ -16,14 +19,14 @@ classdef varBayesModelParafac2 < handle
         function obj = varBayesModelParafac2(X,M)
             % Summary of constructor
             
-            rng(2)
+            rng(4)
             if nargin < 1
                 % Some dims to test
-                m = 5;
-                dim = 5;
-                k = 5;
-                obj.data.M = 1*m;
-                obj.data.Mtrue=1*m;
+                m = 2;
+                dim = 2;
+                k = 2;
+                obj.data.M = m;
+                obj.data.Mtrue= m;
                 
                 obj.data.X = zeros([dim dim k]);
             else
@@ -37,8 +40,8 @@ classdef varBayesModelParafac2 < handle
             obj.qDist = varDistributionC(obj);
             
         end
-        
-        
+%     
+%         
         function status = computeVarDistribution(obj)
             % Implementation of CAVI to compute the variational distribution
             % of the probabilistic Parafac2 model
@@ -50,22 +53,22 @@ classdef varBayesModelParafac2 < handle
             ELBO_prev = 0;
             
             if obj.verbose
-            
-            names = {'ELBO','ePxz','eQz','eX','eA','eC','eF','eP','eSigma','eAlpha','hA','hC','hF','hP','hSigma','hAlpha'};
+            %'ELBO','ePxz','eQz'
+            names = {'ELBO Diff','eX','eA','eC','eF','eP','eSigma','eAlpha','hA','hC','hF','hP','hSigma','hAlpha'};
             
             fprintf('%5s','Iter');
             for i = 1:numel(names)
-                fprintf('%15s',names{i})
+                fprintf('%10s',names{i})
             end
             fprintf('\n') ;
             end
             % Update Variational Factors until ELBO has converged
-            iter = 0;
+            obj.iter = 0;
             
             diff = ELBO-ELBO_prev;
-            while abs(diff)/abs(ELBO) > 1e-6
+            while abs(diff)/abs(ELBO) > 1e-9 && obj.maxiter > obj.iter
                 
-                iter = iter+1;
+                
                 % Update all variational factors
                 obj.qDist.updateMoments;
                 
@@ -74,23 +77,29 @@ classdef varBayesModelParafac2 < handle
                 ELBO_prev = ELBO;
                 ELBO = obj.qDist.ELBO;
                 
+                if isempty(obj.ELBO_chain) || numel(obj.ELBO_chain)<obj.iter+1
+                    obj.ELBO_chain = [obj.ELBO_chain zeros(1,100)];
+                end
+                obj.ELBO_chain(obj.iter+1) = ELBO;
                 
+                
+
                 diff = ELBO-ELBO_prev;
-                if obj.verbose
-                if diff < -1e-6
+                if obj.verbose && obj.iter ~= 0
+                if diff < -1e-6 
                    fprintf('ELBO not converging; difference is %.4f \n',diff)
                    status=-1;
                 end
                 
                 
-                
                 % Output progress
                 % ...
-                fprintf('%5d',iter);
-                obj.displayResultsAll;
+                fprintf('%5d',obj.iter);
+                obj.displayResultsAll(diff);
                 end
+                obj.iter = obj.iter+1;
             end
-            %fprintf('%5d',iter);
+            %fprintf('%5d',obj.iter);
             %obj.displayResults;
                 
             if obj.verbose
@@ -100,6 +109,7 @@ classdef varBayesModelParafac2 < handle
             end
             fprintf('\n');
             end
+            obj.ELBO_chain = nonzeros(obj.ELBO_chain)';
         end
         
         function displayResults(obj)
@@ -108,7 +118,7 @@ classdef varBayesModelParafac2 < handle
 %             fprintf('ELBO: %f \n',obj.qDist.ELBO);
 %             fprintf('ePxz: %f \n',obj.qDist.ePxz);
 %             fprintf('eQz: %f \n',obj.qDist.eQz);
-              fprintf('%25.2f',...
+              fprintf('%15.2e',...
                   obj.qDist.ELBO)%,obj.qDist.ePxz,obj.qDist.eQz,...
 %                   obj.qDist.XqMeanLog,obj.qDist.AqMeanLog,obj.qDist.CqMeanLog,...
 %                   obj.qDist.FqMeanLog,obj.qDist.PqMeanLog,obj.qDist.SigmaqMeanLog,...
@@ -119,21 +129,22 @@ classdef varBayesModelParafac2 < handle
 
         end
         
-        function displayResultsAll(obj)
+        function displayResultsAll(obj,diff)
             
-%             disp(repmat('*',1,20))
-%             fprintf('ELBO: %f \n',obj.qDist.ELBO);
-%             fprintf('ePxz: %f \n',obj.qDist.ePxz);
-%             fprintf('eQz: %f \n',obj.qDist.eQz);
-              fprintf('%15.2f',...
-                  obj.qDist.ELBO,obj.qDist.ePxz,obj.qDist.eQz,...
-                  obj.qDist.XqMeanLog,obj.qDist.AqMeanLog,obj.qDist.CqMeanLog,...
-                  obj.qDist.FqMeanLog,obj.qDist.PqMeanLog,obj.qDist.SigmaqMeanLog,...
-                  obj.qDist.AlphaqMeanLog,obj.qDist.AqEntropy,obj.qDist.CqEntropy,...
-                  obj.qDist.FqEntropy,obj.qDist.PqEntropy,obj.qDist.SigmaqEntropy,...
-                  obj.qDist.AlphaqEntropy)
-               fprintf('\n')
-
+            %             disp(repmat('*',1,20))
+            %             fprintf('ELBO: %f \n',obj.qDist.ELBO);
+            %             fprintf('ePxz: %f \n',obj.qDist.ePxz);
+            %             fprintf('eQz: %f \n',obj.qDist.eQz);
+            %                   obj.qDist.ELBO,obj.qDist.ePxz,obj.qDist.eQz,...
+            fprintf('%10.2e',...
+                diff)%,...
+%             obj.qDist.qXMeanLog,obj.qDist.qAMeanLog,obj.qDist.qCMeanLog,...
+%             obj.qDist.qFMeanLog,obj.qDist.qPMeanLog,obj.qDist.qSigmaMeanLog,...
+%             obj.qDist.qAlphaMeanLog,obj.qDist.qAEntropy,obj.qDist.qCEntropy,...
+%             obj.qDist.qFEntropy,obj.qDist.qPEntropy,obj.qDist.qSigmaEntropy,...
+%             obj.qDist.qAlphaEntropy)
+        fprintf('\n')
+        
         end
     end
 end

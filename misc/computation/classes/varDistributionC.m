@@ -349,7 +349,7 @@ classdef varDistributionC < handle
 %                         disp('Not symmetric') 
 %                     end
                     t1 = t1+obj.qSigma.meanGamma(k)*(obj.eCtC(:,:,k).*obj.qA.meanOuterProduct*...
-                        sum(repmat(obj.ePtP(m,allButM,k)',1,obj.data.M).*tempMean(allButM,:))')';
+                        sum(repmat(obj.ePtP(m,allButM,k)',1,obj.data.M).*tempMean(allButM,:),1)')';
                     
                     t2 = t2+obj.qSigma.meanGamma(k)*obj.qP.mean(:,m,k)'*obj.data.X(:,:,k)'*obj.qA.mean*obj.eD(:,:,k);
                 end
