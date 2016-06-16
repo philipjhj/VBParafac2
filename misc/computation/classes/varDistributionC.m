@@ -105,33 +105,39 @@ classdef varDistributionC < handle
                 obj.data.AlphaAtrue = 1;
                 obj.data.AlphaBtrue = 1;
                 
-%                 obj.data.Sigmatrue = repmat(1e9,1,obj.data.K);
-                               obj.data.Sigmatrue = 1./gamrnd(obj.data.SigmaAtrue,1/obj.data.SigmaBtrue,1,obj.data.K);
-                obj.data.Alphatrue = 1./gamrnd(obj.data.AlphaAtrue,1/obj.data.AlphaBtrue,1,obj.data.Mtrue);
+
+                obj.data.Sigmatrue = gamrnd(obj.data.SigmaAtrue,obj.data.SigmaBtrue,1,obj.data.K);
+                obj.data.Alphatrue = gamrnd(obj.data.AlphaAtrue,obj.data.AlphaBtrue,1,obj.data.Mtrue);
+
+                obj.data.Atrue = mvnrnd(zeros(obj.data.I,obj.data.Mtrue),eye(obj.data.Mtrue));
+                obj.data.Ftrue = mvnrnd(zeros(obj.data.M,obj.data.Mtrue),eye(obj.data.Mtrue));
                 
-                obj.data.Atrue = 5*randn(obj.data.I,obj.data.Mtrue);
-                obj.data.Ftrue = 5*randn(obj.data.Mtrue,obj.data.Mtrue);
-                obj.data.Ptrue = 5*randn(obj.data.J,obj.data.Mtrue,obj.data.K);
-                
-                obj.data.Ctrue = 5*randn(obj.data.K,obj.data.Mtrue).*repmat(sqrt(obj.data.Alphatrue),obj.data.K,1);
+                obj.data.Ctrue = mvnrnd(zeros(obj.data.K,obj.data.Mtrue),1./obj.data.Alphatrue*eye(obj.data.Mtrue));
                 
                 obj.data.Etrue = zeros(obj.data.I,obj.data.J,obj.data.K);
                 obj.data.X = zeros(obj.data.I,obj.data.J,obj.data.K);
+                obj.data.Ptrue = zeros(obj.data.J,obj.data.M,obj.data.K);
                 
                 for k = 1:obj.data.K
-                    obj.data.Etrue(:,:,k) = randn(obj.data.I,obj.data.J)*sqrt(obj.data.Sigmatrue(k));
-                    obj.data.X(:,:,k) = obj.data.Atrue*diag(obj.data.Ctrue(k,:))*obj.data.Ftrue'*obj.data.Ptrue(:,:,k)'+obj.data.Etrue(:,:,k);
+                    
+                    obj.data.Ptrue(:,:,k) = orth(mvnrnd(zeros(obj.data.J,obj.data.Mtrue),eye(obj.data.Mtrue)));
+                
+                    obj.data.Etrue(:,:,k) = mvnrnd(zeros(obj.data.I,obj.data.J)...
+                        ,eye(obj.data.J)*1./obj.data.Sigmatrue(k));
+                    obj.data.X(:,:,k) = obj.data.Atrue*diag(obj.data.Ctrue(k,:))*...
+                        obj.data.Ftrue'*obj.data.Ptrue(:,:,k)'+obj.data.Etrue(:,:,k);
                 end
-                
-                
             end
-            
-            
-            
+
             obj.X = obj.data.X;
-            
-            
             obj.XInnerProduct = obj.computeXInnerProduct;
+
+%             obj.qA.mean = obj.data.Atrue;
+%             obj.qC.mean = obj.data.Ctrue;
+% %             obj.qF.mean = obj.data.Ftrue;
+%             obj.qP.mean = obj.data.Ptrue;
+%             obj.qAlpha.mean = obj.data.Alphatrue;
+%             obj.qSigma.mean = obj.data.Sigmatrue;
             
         end
         
@@ -242,8 +248,10 @@ classdef varDistributionC < handle
         end
         
         function value = computeCqMeanLog(obj)
-            
-            value = 1/2*obj.qAlpha.entropy-1/2*trace(obj.qC.mean*diag(obj.qAlpha.meanGamma)*obj.qC.mean');
+            if isempty(obj.qAlpha.entropy)
+                 obj.qAlpha.updateStatistics;
+            end
+            value = 1/2*obj.qAlpha.entropy-1/2*trace(obj.qC.mean*diag(obj.qAlpha.mean)*obj.qC.mean');
         end
         
         function value = computeFqMeanLog(obj)
