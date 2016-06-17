@@ -1,23 +1,28 @@
+function plotParafac2SolutionK(k,X,A,C,F,P,Atrue,Ctrue,Ftrue,Ptrue,MLEflag)
 
 
 
-
-
-
-figure(1)
-clf
-
-ha=tight_subplot(2,5,[0.1 0.02],[0.01 0.05],[0.015 0.015]);
+if nargin < 11
+    MLEflag = 0;
+end
 
 equalColorScale = 0;
 
-for k = 1:myModel.data.K;   
-% subplot(2,3,[1 4])
 
-xRecon = myModel.qDist.qA.mean*diag(myModel.qDist.qC.mean(k,:))*myModel.qDist.qF.mean'*myModel.qDist.qP.mean(:,:,k)';
+
+if MLEflag
+    nRows = 3;
+else
+    nRows = 2;
+end
+
+
+ha=tight_subplot(nRows,5,[0.1 0.02],[0.01 0.05],[0.015 0.015]);
+
+xRecon = A*diag(C(k,:))*F'*P(:,:,k)';
 
 % ### X plot
-myImageTrue = myModel.data.X(:,:,k);
+myImageTrue = X(:,:,k);
 myImageEsti = xRecon;
 
 if 0
@@ -38,8 +43,8 @@ titleText = strcat('Xk estimate, k =',num2str(k));
 displayImageValues(myImageEsti,titleText,colorInterval)
 
 % ### A Plot
-myImageTrue = myModel.data.Atrue;
-myImageEsti = myModel.qDist.qA.mean;
+myImageTrue = Atrue;
+myImageEsti = A;
 
 if equalColorScale
     colorInterval = findColorInterval(myImageTrue,myImageEsti);
@@ -61,8 +66,8 @@ displayImageValues(myImageEsti,titleText,colorInterval)
 
 
 % ### C Plot
-myImageTrue = diag(myModel.data.Ctrue(k,:));
-myImageEsti = diag(myModel.qDist.qC.mean(k,:));
+myImageTrue = diag(Ctrue(k,:));
+myImageEsti = diag(C(k,:));
 
 if equalColorScale
     colorInterval = findColorInterval(myImageTrue,myImageEsti);
@@ -82,8 +87,8 @@ displayImageValues(myImageEsti,titleText,colorInterval)
 
 
 % ### F Plot
-myImageTrue = myModel.data.Ftrue';
-myImageEsti = myModel.qDist.qF.mean';
+myImageTrue = Ftrue';
+myImageEsti = F';
 
 if equalColorScale
     colorInterval = findColorInterval(myImageTrue,myImageEsti);
@@ -103,8 +108,8 @@ titleText = 'qF mean';
 displayImageValues(myImageEsti,titleText,colorInterval)
 
 % ### P Plot
-myImageTrue = myModel.data.Ptrue(:,:,k)';
-myImageEsti = myModel.qDist.qP.mean(:,:,k)';
+myImageTrue = Ptrue(:,:,k)';
+myImageEsti = P(:,:,k)';
 
 if equalColorScale
     colorInterval = findColorInterval(myImageTrue,myImageEsti);
@@ -123,52 +128,77 @@ axes(ha(10))
 titleText = 'qPk mean';
 displayImageValues(myImageEsti,titleText,colorInterval)
 
-pause
 
+if MLEflag
+    
+    
+    [A,F,C,P,fit]=parafac2(X,size(A,2),[0 0],[0 0 0 0 1]);
+    
+    P = cat(3,P{:});
+    
+    XreconMLE = A*diag(C(k,:))*F'*P(:,:,k)';
+    
+    
+    
+    % ### X Plot
+    myImageEsti = XreconMLE;
+    
+    axes(ha(11))
+    titleText = 'Xk MLE';
+    displayImageValues(myImageEsti,titleText,colorInterval)
+    
+    
+    % ### A Plot
+    myImageEsti = A;
+    
+    axes(ha(12))
+    titleText = 'A MLE';
+    displayImageValues(myImageEsti,titleText,colorInterval)
+    
+    
+    % ### C Plot
+    myImageEsti = diag(C(k,:));
+    
+    axes(ha(13))
+    titleText = 'Ck MLE';
+    displayImageValues(myImageEsti,titleText,colorInterval)
+    
+    % ### A Plot
+    myImageEsti = F';
+    
+    axes(ha(14))
+    titleText = 'F MLE';
+    displayImageValues(myImageEsti,titleText,colorInterval)
+    
+    % ### A Plot
+    myImageEsti = P(:,:,k)';
+    
+    axes(ha(15))
+    titleText = 'Pk MLE';
+    displayImageValues(myImageEsti,titleText,colorInterval)
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
 end
 
 
 
-%%
 
 
 
 
 
-for k = 1:myModel.data.K
-    figure(4)
-    subplot(1,2,1)
-    imagesc(myModel.data.Ptrue(:,:,k))
-    colorbar
-    subplot(1,2,2)
-    imagesc(myModel.qDist.qP.mean(:,:,k))
-    colorbar
-    pause(1)
+
 end
-
-
-%%
-
-
-    figure(5)
-    subplot(1,2,1)
-    imagesc(myModel.data.Ctrue)
-    colorbar
-    subplot(1,2,2)
-    imagesc(myModel.qDist.qC.mean)
-    colorbar
-    pause(3)
-    
-    %%
-    
-    myModel.qDist.qSigma
-    myModel.qDist.qAlpha.mean
-
-
-
-
-
-
-
-
-

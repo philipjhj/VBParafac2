@@ -9,9 +9,9 @@ classdef varBayesModelParafac2 < handle
         
         % Settings
         verbose = 1; % 1, display, 0 hide everything
-        maxiter = 500;%intmax;
+        maxiter = intmax;
     end
-    properties (Constant)
+    properties
         data = dataClass;
     end
     
@@ -19,12 +19,12 @@ classdef varBayesModelParafac2 < handle
         function obj = varBayesModelParafac2(X,M)
             % Summary of constructor
             
-            rng(4)
+            
             if nargin < 1
                 % Some dims to test
-                m = 2;
-                dim = 2;
-                k = 2;
+                m = 4;
+                dim = 10;
+                k = 4;
                 obj.data.M = m;
                 obj.data.Mtrue= m;
                 
@@ -40,8 +40,18 @@ classdef varBayesModelParafac2 < handle
             obj.qDist = varDistributionC(obj);
             
         end
-%     
-%         
+        %
+        %
+        
+        
+        function restartqDist(obj)
+            
+            obj.qDist = varDistributionC(obj);
+            
+            
+        end
+        
+        
         function status = computeVarDistribution(obj)
             % Implementation of CAVI to compute the variational distribution
             % of the probabilistic Parafac2 model
@@ -137,7 +147,7 @@ classdef varBayesModelParafac2 < handle
             %             fprintf('eQz: %f \n',obj.qDist.eQz);
             %                   obj.qDist.ELBO,obj.qDist.ePxz,obj.qDist.eQz,...
             fprintf('%10.2e',...
-                diff)%,...
+                diff,obj.qDist.ELBO)%,...
 %             obj.qDist.qXMeanLog,obj.qDist.qAMeanLog,obj.qDist.qCMeanLog,...
 %             obj.qDist.qFMeanLog,obj.qDist.qPMeanLog,obj.qDist.qSigmaMeanLog,...
 %             obj.qDist.qAlphaMeanLog,obj.qDist.qAEntropy,obj.qDist.qCEntropy,...
@@ -146,5 +156,24 @@ classdef varBayesModelParafac2 < handle
         fprintf('\n')
         
         end
+        
+        
+        
+        % #### Plot functions
+        function plotSolution(obj,k,MLEflag)
+            
+            
+%             MLEflag = 1;
+           
+            plotParafac2SolutionK(k,obj.data.X,obj.qDist.qA.mean,obj.qDist.qC.mean,...
+                obj.qDist.qF.mean,obj.qDist.qP.mean,obj.data.Atrue,obj.data.Ctrue,...
+                obj.data.Ftrue,obj.data.Ptrue,MLEflag);
+            
+            
+        end
+        
+        
+        
+        
     end
 end
