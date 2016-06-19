@@ -19,11 +19,11 @@ classdef varBayesModelParafac2 < handle
         function obj = varBayesModelParafac2(X,M)
             % Summary of constructor
             
-            rng(4)
+            rng(2)
             if nargin < 1
                 % Some dims to test
                 m = 2;
-                dim = 2;
+                dim = 5;
                 k = 5;
                 obj.data.M = m;
                 obj.data.Mtrue= m;

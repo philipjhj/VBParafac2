@@ -103,14 +103,14 @@ classdef varDistributionC < handle
                 obj.data.AlphaBtrue = 1;
                 
                 %                 obj.data.Sigmatrue = repmat(1e9,1,obj.data.K);
-                obj.data.Sigmatrue = gamrnd(obj.data.SigmaAtrue,obj.data.SigmaBtrue,1,obj.data.K);
-                obj.data.Alphatrue = gamrnd(obj.data.AlphaAtrue,obj.data.AlphaBtrue,1,obj.data.Mtrue);
+                obj.data.Sigmatrue = repmat(1e6,1,obj.data.K);%gamrnd(obj.data.SigmaAtrue,obj.data.SigmaBtrue,1,obj.data.K);
+                obj.data.Alphatrue = repmat(1e-6,1,obj.data.M);%gamrnd(obj.data.AlphaAtrue,obj.data.AlphaBtrue,1,obj.data.Mtrue);
                 
                 
-                obj.data.Atrue = mvnrnd(zeros(obj.data.I,obj.data.Mtrue),eye(obj.data.Mtrue));
-                obj.data.Ftrue = mvnrnd(zeros(obj.data.M,obj.data.Mtrue),eye(obj.data.Mtrue));
+                obj.data.Atrue = 10*mvnrnd(zeros(obj.data.I,obj.data.Mtrue),eye(obj.data.Mtrue));
+                obj.data.Ftrue = 10*mvnrnd(zeros(obj.data.M,obj.data.Mtrue),eye(obj.data.Mtrue));
                 
-                obj.data.Ctrue = mvnrnd(zeros(obj.data.K,obj.data.Mtrue),1./obj.data.Alphatrue*eye(obj.data.Mtrue));
+                obj.data.Ctrue = 10*mvnrnd(zeros(obj.data.K,obj.data.Mtrue),sqrt(1./obj.data.Alphatrue)*eye(obj.data.Mtrue));
                 
                 obj.data.Etrue = zeros(obj.data.I,obj.data.J,obj.data.K);
                 obj.data.X = zeros(obj.data.I,obj.data.J,obj.data.K);
@@ -121,7 +121,7 @@ classdef varDistributionC < handle
                     obj.data.Ptrue(:,:,k) = orth(mvnrnd(zeros(obj.data.J,obj.data.Mtrue),eye(obj.data.Mtrue)));
                 
                     obj.data.Etrue(:,:,k) = mvnrnd(zeros(obj.data.I,obj.data.J)...
-                        ,eye(obj.data.J)*1./obj.data.Sigmatrue(k));
+                        ,eye(obj.data.J)*sqrt(1./obj.data.Sigmatrue(k)));
                     obj.data.X(:,:,k) = obj.data.Atrue*diag(obj.data.Ctrue(k,:))*...
                         obj.data.Ftrue'*obj.data.Ptrue(:,:,k)'+obj.data.Etrue(:,:,k);
                 end
@@ -163,7 +163,7 @@ classdef varDistributionC < handle
 %             obj.qA.mean = obj.data.Atrue;
 %             obj.qC.mean = obj.data.Ctrue;
 % %             obj.qF.mean = obj.data.Ftrue;
-            obj.qP.mean = obj.data.Ptrue;
+%             obj.qP.mean = obj.data.Ptrue;
 %             obj.qAlpha.mean = obj.data.Alphatrue;
 %             obj.qSigma.mean = obj.data.Sigmatrue;
             
@@ -231,6 +231,7 @@ classdef varDistributionC < handle
         % #################################################################
         % Mean values for ELBO
         function computeqXMeanLog(obj)
+        
             t3 = zeros(obj.data.I,obj.data.M,obj.data.K);
             
             dataX = obj.data.X;
@@ -238,15 +239,11 @@ classdef varDistributionC < handle
             qFMean = obj.qF.mean;
             qDMean = obj.eD;
             
-            %             for k = 1:obj.data.K
-            %                 t3(:,:,k) = dataX(:,:,k)*qPMean(:,:,k)*qFMean*qDMean(:,:,k);
-            %             end
-            
             t3 = mtimesx(mtimesx(mtimesx(dataX,qPMean),qFMean),qDMean);
             
             t3sum = sum(sum(sum(multiplyTensor(t3,obj.qSigma.mean),3).*obj.qA.mean));
             
-            obj.qXMeanLog = obj.data.J/2*sum(obj.qSigma.entropy)-1/2*sum(obj.qSigma.mean.*(...
+            obj.qXMeanLog = obj.data.J/2*sum(obj.qSigma.mean)-1/2*sum(obj.qSigma.mean.*(...
                 sum(obj.eAiDFtPtPFDAi)+sum(obj.XInnerProduct)))+t3sum;
         end
         
@@ -258,7 +255,7 @@ classdef varDistributionC < handle
             if isempty(obj.qAlpha.entropy)
                  obj.qAlpha.updateStatistics;
             end
-            obj.qCMeanLog = 1/2*obj.qAlpha.entropy-1/2*trace(obj.qC.mean*diag(obj.qAlpha.mean)*obj.qC.mean');
+            obj.qCMeanLog = 1/2*sum(obj.qAlpha.mean)-1/2*trace(obj.qC.mean*diag(obj.qAlpha.mean)*obj.qC.mean');
         end
         
         function computeqFMeanLog(obj)
@@ -356,25 +353,17 @@ classdef varDistributionC < handle
         
         % ### Variational Factor F
         function updateqF(obj)
-            %                 for m = 1:obj.data.M
-            %                     t1 = 0;
-            %                     for k = 1:obj.data.K
-            %                         t1 = t1+obj.qSigma.mean(k)*obj.eCtC(:,:,k).*obj.qA.meanOuterProduct*obj.ePtP(m,m,k);
-            %                     end
-            %
-            %
-            %
-            % %                     obj.qF.variance(:,:,m) = inv(t1+eye(obj.data.M));
-            %                 end
             
             p = obj.data.M;
             n = obj.data.K;
             
             % Below code replaces a loop over m.
             % the bsxfun as index for ePtP gets the diagonals
-            obj.qF.variance = multinv(squeeze(sum(bsxfun(@times,mtimesx(reshape(obj.qSigma.mean,1,1,obj.data.K),...
+            
+            obj.qF.variance = multinv(bsxfun(@plus,squeeze(sum(bsxfun(@times,mtimesx(...
+                reshape(obj.qSigma.mean,1,1,obj.data.K),...
                 bsxfun(@times,obj.eCtC,obj.qA.meanOuterProduct)),...
-                reshape(obj.ePtP(bsxfun(@plus,[1:p+1:p*p]',[0:n-1]*p*p))',1,1,n,p)),3)));
+                reshape(obj.ePtP(bsxfun(@plus,[1:p+1:p*p]',[0:n-1]*p*p))',1,1,n,p)),3)),eye(obj.data.M)));
             
             
             
@@ -601,11 +590,11 @@ classdef varDistributionC < handle
         
         function value = computeXInnerProduct(obj)
             value = zeros(1,obj.data.K);
-            %             for i = 1:obj.data.I
-            for k = 1:obj.data.K
-                value(k) = sum(sum(obj.data.X(:,:,k).^2));
+            for i = 1:obj.data.I
+                for k = 1:obj.data.K
+                    value(i,k) = sum(obj.data.X(i,:,k).^2);
+                end
             end
-            %             end
         end
         
         % #################################################################

@@ -40,19 +40,23 @@ classdef multiNormalDist < probabilityDist
            value = obj.computeElementWiseSquared; 
         end
         
-        function value = get.meanInnerProductSumComponent(obj)    
-%                 value = sum(sum(sum(obj.distSquared)));
-
-                  if ismatrix(obj.mean)
-%                   value = trace(obj.mean*obj.mean')+trace(sum(obj.variance,3));
-                  value = sum(sum(obj.mean.^2))+trace(sum(obj.variance,3));
-                  else
-                      value = 0;
-                      for k = 1:obj.arrayDim(3)
-                         value = value+sum(sum(obj.mean(:,:,k).^2))+trace(sum(obj.variance(:,:,:,k),3)); 
-%                          value = value+trace(obj.mean(:,:,k)*obj.mean(:,:,k)')+trace(sum(obj.variance(:,:,:,k),3)); 
-                      end
-                  end
+        function value = get.meanInnerProductSumComponent(obj)
+            %                 value = sum(sum(sum(obj.distSquared)));
+            
+            if ismatrix(obj.mean)
+                %                   value = trace(obj.mean*obj.mean')+trace(sum(obj.variance,3));
+                if obj.VarEqual
+                    value = sum(sum(obj.mean.^2))+obj.I*trace(obj.variance);
+                else
+                    value = sum(sum(obj.mean.^2))+trace(sum(obj.variance,3));
+                end
+            else
+                value = 0;
+                for k = 1:obj.arrayDim(3)
+                    value = value+sum(sum(obj.mean(:,:,k).^2))+obj.I*trace(obj.variance(:,:,:,k));
+                    %                          value = value+trace(obj.mean(:,:,k)*obj.mean(:,:,k)')+trace(sum(obj.variance(:,:,:,k),3));
+                end
+            end
         end
         
         function value = get.meanOuterProduct(obj)
@@ -182,14 +186,24 @@ classdef multiNormalDist < probabilityDist
            
             if ismatrix(obj.mean)
                 % 2D
-                value = sum(obj.variance,3) + obj.mean'*obj.mean;
+                
+                if obj.VarEqual
+                    value = obj.I*obj.variance + obj.mean'*obj.mean;
+                else
+                    value = sum(obj.variance,3) + obj.mean'*obj.mean;
+                end
             else
                 % 3D
                 K = obj.arrayDim(3);
                 value = zeros(obj.arrayDim(2),obj.arrayDim(2),K);
                 for k = 1:K
-                    value(:,:,k) = sum(obj.variance(:,:,:,k),3) + ...
-                       obj.mean(:,:,k)'*obj.mean(:,:,k);
+                    if obj.varEqual
+                        value(:,:,k) = obj.I*obj.variance(:,:,:,k) + ...
+                            obj.mean(:,:,k)'*obj.mean(:,:,k);    
+                    else
+                        value(:,:,k) = sum(obj.variance(:,:,:,k),3) + ...
+                            obj.mean(:,:,k)'*obj.mean(:,:,k);
+                    end
                 end
             end 
             
@@ -291,7 +305,12 @@ classdef multiNormalDist < probabilityDist
 %                         +obj.J/2;
                 end
             end
-            obj.entropy = value;
+            
+            if obj.VarEqual
+                obj.entropy = obj.I*value;
+            else
+                obj.entropy = value;
+            end
         end
     end
 end
