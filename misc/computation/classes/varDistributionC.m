@@ -2,6 +2,7 @@ classdef varDistributionC < handle
     properties (Access = private)
         % Data reference property
         data
+        
     end
     
     properties
@@ -30,7 +31,7 @@ classdef varDistributionC < handle
         % Settings
         method='manopt' % Method used to approximate E(qP)
         debugflag = 1
-        activeParams = {'qA','qC','qF','qP','qSigma','qAlpha'}
+        activeParams_opt = {'qA','qC','qF','qP','qSigma','qAlpha'}
     end
     
     properties
@@ -85,6 +86,7 @@ classdef varDistributionC < handle
             
             % Initialize Data
             obj.data = modelobj.data;
+%             obj.iter = modelobj.iter;
             
             obj.qA = multiNormalDist('qA',[obj.data.I obj.data.M]);
             obj.qC = multiNormalDist('qC',[obj.data.K obj.data.M]);
@@ -96,8 +98,9 @@ classdef varDistributionC < handle
             
             obj.pSigma = inverseGammaDist('pSigma',[1 obj.data.K]);
             obj.pAlpha = inverseGammaDist('pAlpha',[1 obj.data.M]);
-            obj.pP = multiNormalDist('pP',[obj.data.K obj.data.M]);
+%             obj.pP = multiNormalDist('pP',[obj.data.K obj.data.M]);
             
+%             obj.pAlpha.beta=obj.pAlpha.beta*20;
             
             if sum(sum(sum(obj.data.X)))==0
                 obj.data.SigmaAtrue = 1;
@@ -105,14 +108,14 @@ classdef varDistributionC < handle
                 obj.data.AlphaAtrue = 1;
                 obj.data.AlphaBtrue = 1;
                 
+%repmat(1e3,1,obj.data.K);%
+                obj.data.Sigmatrue = repmat(1e6,1,obj.data.K);%gamrnd(obj.data.SigmaAtrue,obj.data.SigmaBtrue,1,obj.data.K);
+                obj.data.Alphatrue = repmat(1e-6,1,obj.data.M);%gamrnd(obj.data.AlphaAtrue,obj.data.AlphaBtrue,1,obj.data.Mtrue);
 
-                obj.data.Sigmatrue = gamrnd(obj.data.SigmaAtrue,obj.data.SigmaBtrue,1,obj.data.K);
-                obj.data.Alphatrue = gamrnd(obj.data.AlphaAtrue,obj.data.AlphaBtrue,1,obj.data.Mtrue);
-
-                obj.data.Atrue = mvnrnd(zeros(obj.data.I,obj.data.Mtrue),eye(obj.data.Mtrue));
-                obj.data.Ftrue = mvnrnd(zeros(obj.data.M,obj.data.Mtrue),eye(obj.data.Mtrue));
+                obj.data.Atrue = 10*mvnrnd(zeros(obj.data.I,obj.data.Mtrue),eye(obj.data.Mtrue));
+                obj.data.Ftrue = 10*mvnrnd(zeros(obj.data.M,obj.data.Mtrue),eye(obj.data.Mtrue));
                 
-                obj.data.Ctrue = mvnrnd(zeros(obj.data.K,obj.data.Mtrue),1./obj.data.Alphatrue*eye(obj.data.Mtrue));
+                obj.data.Ctrue = 10*mvnrnd(zeros(obj.data.K,obj.data.Mtrue),sqrt(1./obj.data.Alphatrue)*eye(obj.data.Mtrue));
                 
                 obj.data.Etrue = zeros(obj.data.I,obj.data.J,obj.data.K);
                 obj.data.X = zeros(obj.data.I,obj.data.J,obj.data.K);
@@ -123,7 +126,7 @@ classdef varDistributionC < handle
                     obj.data.Ptrue(:,:,k) = orth(mvnrnd(zeros(obj.data.J,obj.data.Mtrue),eye(obj.data.Mtrue)));
                 
                     obj.data.Etrue(:,:,k) = mvnrnd(zeros(obj.data.I,obj.data.J)...
-                        ,eye(obj.data.J)*1./obj.data.Sigmatrue(k));
+                        ,eye(obj.data.J)*sqrt(1./obj.data.Sigmatrue(k)));
                     obj.data.X(:,:,k) = obj.data.Atrue*diag(obj.data.Ctrue(k,:))*...
                         obj.data.Ftrue'*obj.data.Ptrue(:,:,k)'+obj.data.Etrue(:,:,k);
                 end
@@ -157,31 +160,31 @@ classdef varDistributionC < handle
         % ## Mean terms
         function value = get.ePxz(obj)
             % Recompute updated terms
-            if any(ismember({'qA','qC','qF','qP','qSigma'},obj.activeParams)) || isempty(obj.XqMeanLog)
+            if any(ismember({'qA','qC','qF','qP','qSigma'},obj.activeParams_opt)) || isempty(obj.XqMeanLog)
                 obj.XqMeanLog = obj.computeXqMeanLog;
             end
             
-            if ismember('qA',obj.activeParams) || isempty(obj.AqMeanLog)
+            if ismember('qA',obj.activeParams_opt) || isempty(obj.AqMeanLog)
                 obj.AqMeanLog = obj.computeAqMeanLog;
             end
             
-            if any(ismember({'qC','qAlpha'},obj.activeParams)) || isempty(obj.CqMeanLog)
+            if any(ismember({'qC','qAlpha'},obj.activeParams_opt)) || isempty(obj.CqMeanLog)
                 obj.CqMeanLog = obj.computeCqMeanLog;
             end
             
-            if ismember('qF',obj.activeParams) || isempty(obj.FqMeanLog)
+            if ismember('qF',obj.activeParams_opt) || isempty(obj.FqMeanLog)
                 obj.FqMeanLog = obj.computeFqMeanLog;
             end
             
-            if ismember('qP',obj.activeParams) || isempty(obj.PqMeanLog)
+            if ismember('qP',obj.activeParams_opt) || isempty(obj.PqMeanLog)
                 obj.PqMeanLog = obj.computePqMeanLog;
             end
             
-            if ismember('qSigma',obj.activeParams) || isempty(obj.SigmaqMeanLog)
+            if ismember('qSigma',obj.activeParams_opt) || isempty(obj.SigmaqMeanLog)
                 obj.SigmaqMeanLog = obj.computeSigmaqMeanLog;
             end
             
-            if ismember('qAlpha',obj.activeParams) || isempty(obj.AlphaqMeanLog)
+            if ismember('qAlpha',obj.activeParams_opt) || isempty(obj.AlphaqMeanLog)
                 obj.AlphaqMeanLog = obj.computeAlphaqMeanLog;
             end
             
@@ -194,19 +197,19 @@ classdef varDistributionC < handle
         % ## Entropy terms
         function value = get.eQz(obj)
             % Recompute updated terms
-            if ismember('qA',obj.activeParams) || isempty(obj.AqEntropy)
+            if ismember('qA',obj.activeParams_opt) || isempty(obj.AqEntropy)
                 obj.AqEntropy = obj.qA.entropy;
             end
             
-            if ismember('qC',obj.activeParams) || isempty(obj.CqEntropy)
+            if ismember('qC',obj.activeParams_opt) || isempty(obj.CqEntropy)
                 obj.CqEntropy = obj.qC.entropy;
             end
             
-            if ismember('qF',obj.activeParams) || isempty(obj.FqEntropy)
+            if ismember('qF',obj.activeParams_opt) || isempty(obj.FqEntropy)
                 obj.FqEntropy = obj.qF.entropy;
             end
             
-            if ismember('qP',obj.activeParams) || isempty(obj.PqEntropy)
+            if ismember('qP',obj.activeParams_opt) || isempty(obj.PqEntropy)
                 if strcmp(obj.method,'vonmises')
                     if isempty(obj.qPvonmisesEntropy)
                         obj = obj.qPmean;
@@ -217,11 +220,11 @@ classdef varDistributionC < handle
                 end
             end
             
-            if ismember('qSigma',obj.activeParams) || isempty(obj.SigmaqEntropy)
+            if ismember('qSigma',obj.activeParams_opt) || isempty(obj.SigmaqEntropy)
                 obj.SigmaqEntropy = obj.qSigma.entropy;
             end
             
-            if ismember('qAlpha',obj.activeParams) || isempty(obj.AlphaqEntropy)
+            if ismember('qAlpha',obj.activeParams_opt) || isempty(obj.AlphaqEntropy)
                 obj.AlphaqEntropy = obj.qAlpha.entropy;
             end
             
@@ -239,7 +242,7 @@ classdef varDistributionC < handle
                 t3(k) = sum(sum(obj.data.X(:,:,k)*obj.eP(:,:,k)*obj.eF*obj.eD(:,:,k).*obj.qA.mean));
             end
             
-            value = obj.data.J/2*sum(obj.qSigma.entropy)-1/2*sum(obj.qSigma.meanGamma.*(...
+            value = obj.data.J/2*sum(obj.qSigma.mean)-1/2*sum(obj.qSigma.meanGamma.*(...
                sum(obj.eAiDFtPtPFDAi)+sum(obj.XInnerProduct)-2*t3));
         end
         
@@ -251,7 +254,7 @@ classdef varDistributionC < handle
             if isempty(obj.qAlpha.entropy)
                  obj.qAlpha.updateStatistics;
             end
-            value = 1/2*obj.qAlpha.entropy-1/2*trace(obj.qC.mean*diag(obj.qAlpha.mean)*obj.qC.mean');
+            value = 1/2*sum(obj.qAlpha.meanGamma)-1/2*trace(obj.qC.mean*diag(obj.qAlpha.meanGamma)*obj.qC.mean');
         end
         
         function value = computeFqMeanLog(obj)
@@ -263,11 +266,11 @@ classdef varDistributionC < handle
         end
         
         function value = computeSigmaqMeanLog(obj)
-            value = sum((-obj.pSigma.alpha-1).*obj.qSigma.mean-obj.qSigma.meanGamma.*obj.pSigma.beta);
+            value = sum((-obj.pSigma.alpha-1).*obj.qSigma.meanGamma-obj.qSigma.meanGamma.*obj.pSigma.beta);
         end
         
         function value = computeAlphaqMeanLog(obj)
-            value = sum((-obj.pAlpha.alpha-1).*obj.qAlpha.mean-obj.qAlpha.meanGamma.*obj.pAlpha.beta);
+            value = sum((-obj.pAlpha.alpha-1).*obj.qAlpha.meanGamma-obj.qAlpha.meanGamma.*obj.pAlpha.beta);
         end
         
         % #################################################################
@@ -275,27 +278,34 @@ classdef varDistributionC < handle
         
         % ## Update control function
         function updateMoments(obj)
-            if ismember('qA',obj.activeParams)
-                obj.updateA;
-%                 check_variance_matrix(obj.qA.variance);
-            end
-            if ismember('qC',obj.activeParams)
-                obj.updateC;
-%                 check_variance_matrix(obj.qC.variance);
-            end
-            if ismember('qF',obj.activeParams)
-                obj.updateF;
-%                 check_variance_matrix(obj.qF.variance);
-            end
-            if ismember('qP',obj.activeParams)
+            if ismember('qP',obj.activeParams_opt)
                 obj.updateP;
 %                 check_variance_matrix(obj.qP.variance);
             end
-            if ismember('qSigma',obj.activeParams)
+            
+            if ismember('qF',obj.activeParams_opt)
+                obj.updateF;
+%                 check_variance_matrix(obj.qF.variance);
+            end
+            
+            if ismember('qC',obj.activeParams_opt)
+                obj.updateC;
+%                 check_variance_matrix(obj.qC.variance);
+            end
+            
+            if ismember('qA',obj.activeParams_opt)
+                obj.updateA;
+%                 check_variance_matrix(obj.qA.variance);
+            end
+            
+            if ismember('qSigma',obj.activeParams_opt)
                 obj.updateSigma;
             end
-            if ismember('qAlpha',obj.activeParams)
-                obj.updateAlpha;
+            if ismember('qAlpha',obj.activeParams_opt)
+                if obj.data.iter > 25
+%                     disp(obj.data.iter)
+                    obj.updateAlpha;
+                end
             end
         end
         
@@ -313,10 +323,15 @@ classdef varDistributionC < handle
                     sum_k = sum_k + obj.qSigma.meanGamma(k)*obj.eD(:,:,k)*obj.eF'*obj.eP(:,:,k)'*obj.data.X(i,:,k)';
                 end
                 
-                check_ELBO(obj,ELBO_prev,obj.qA.varname,'variance',obj.debugflag)
-                ELBO_prev = obj.ELBO;
-                obj.qA.mean(i,:) = obj.qA.variance(:,:,i)*sum_k;
-                check_ELBO(obj,ELBO_prev,obj.qA.varname,'mean',obj.debugflag)
+%                 check_ELBO(obj,ELBO_prev,obj.qA.varname,'variance',obj.debugflag)
+%                 ELBO_prev = obj.ELBO;
+                
+
+                  if any(any(abs(obj.qA.variance(:,:,i)*sum_k)<1e-3))
+                      keyboard
+                  end
+                  obj.qA.mean(i,:) = obj.qA.variance(:,:,i)*sum_k;
+%                 check_ELBO(obj,ELBO_prev,obj.qA.varname,'mean',obj.debugflag)
             end
             
         end
@@ -327,6 +342,11 @@ classdef varDistributionC < handle
                 
                 obj.qC.variance(:,:,k) = inv(obj.qSigma.meanGamma(k)*obj.qA.meanOuterProduct.*obj.eFtPtPF(:,:,k) + diag(obj.qAlpha.meanGamma));
                 
+                
+                
+                  if any(abs(obj.qSigma.meanGamma(k)*diag(obj.qF.mean'*obj.qP.mean(:,:,k)'*obj.data.X(:,:,k)'*obj.qA.mean)'*obj.qC.variance(:,:,k))<1e-3)
+                      keyboard
+                  end
                 
                 obj.qC.mean(k,:) = obj.qSigma.meanGamma(k)*diag(obj.qF.mean'*obj.qP.mean(:,:,k)'*obj.data.X(:,:,k)'*obj.qA.mean)'*obj.qC.variance(:,:,k);
             end
@@ -363,6 +383,13 @@ classdef varDistributionC < handle
                 end
                check_ELBO(obj,ELBO_prev,obj.qF.varname,'variance',obj.debugflag) 
                ELBO_prev = obj.ELBO;
+               
+               
+                  if any(abs((t2-t1)*obj.qF.variance(:,:,m))<1e-6)
+                      keyboard
+                  end
+               
+               
                obj.qF.mean(m,:) = (t2-t1)*obj.qF.variance(:,:,m);
                check_ELBO(obj,ELBO_prev,obj.qF.varname,'mean',obj.debugflag)
             end
@@ -378,7 +405,10 @@ classdef varDistributionC < handle
             if ~strcmp(obj.method,'vonmises')
                 for k = 1:obj.data.K
                     for j = 1:obj.data.J
-                      obj.qP.variance(:,:,j,k) = inv(obj.qSigma.meanGamma(k)*(obj.qF.computeMeanInnerProductScaledSlabs(obj.eCtC(:,:,k).*obj.qA.meanOuterProduct))+eye(obj.data.M));
+                      obj.qP.variance(:,:,j,k) = inv(obj.qSigma.meanGamma(k)*...
+                          (obj.qF.computeMeanInnerProductScaledSlabs(obj.eCtC(:,:,k).*...
+                          obj.qA.meanOuterProduct))+...
+                          eye(obj.data.M));
                     end
                 end
             end
@@ -553,7 +583,7 @@ classdef varDistributionC < handle
             if strcmp(obj.method,'vonmises')
                 value = repmat(eye(obj.data.M),1,1,obj.data.K);
             else
-                value = squeeze(sum(obj.qP.variance,3))+repmat(obj.data.J*eye(obj.data.M),1,1,obj.data.K);%repmat(eye(obj.data.M),1,1,obj.data.K);
+                value = squeeze(sum(obj.qP.variance,3))+repmat(eye(obj.data.M),1,1,obj.data.K);%repmat(eye(obj.data.M),1,1,obj.data.K);
             end
         end
         

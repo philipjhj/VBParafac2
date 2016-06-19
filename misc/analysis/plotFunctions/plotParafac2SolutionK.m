@@ -1,5 +1,47 @@
-function plotParafac2SolutionK(k,X,A,C,F,P,Atrue,Ctrue,Ftrue,Ptrue,MLEflag)
+function plotParafac2SolutionK(k,X,A,C,F,P,Atrue,Ctrue,Ftrue,Ptrue,MLEflag,Etrue)
 
+
+M = size(A,2);
+
+xRecon = A*diag(C(k,:))*F'*P(:,:,k)';
+
+estiCell = {X,A,C,F,P};
+trueCell = {xRecon,Atrue,Ctrue,Ftrue,Ptrue};
+
+
+titleTrueCell ={'Xk, k=',
+    'A True',
+    'diag(C_k True)',
+    'F True',
+    'Pk True'};
+
+
+titleEstiCell = {'Xk estimate, k =',
+    'qA mean',
+    'diag(qC_k mean)',
+    'qF mean',
+    'qPk mean'};
+
+if MLEflag
+    [A_MLE,F_MLE,C_MLE,P_MLE,~]=parafac2(X,size(A,2),[0 0],[0 0 0 0 1]);
+    
+    P_MLE = cat(3,P_MLE{:});
+    
+    XreconMLE = A_MLE*diag(C_MLE(k,:))*F_MLE'*P_MLE(:,:,k)';
+    
+    mleCell = {XreconMLE,A_MLE,C_MLE,F_MLE,P_MLE};
+    
+    %sortData(A_MLE,C_MLE,F_MLE,P_MLE);
+    
+    titleMLECell = {'Xk MLE',
+        'A MLE',
+        'diag(Ck) MLE',
+        'F MLE',
+        'P MLE'};
+    
+else
+    mleCell = [];
+end
 
 
 if nargin < 11
@@ -8,7 +50,11 @@ end
 
 equalColorScale = 0;
 
-
+if equalColorScale
+    colorInterval = findColorInterval(myImageTrue,myImageEsti);
+else
+    colorInterval = [];
+end
 
 if MLEflag
     nRows = 3;
@@ -19,186 +65,120 @@ end
 
 ha=tight_subplot(nRows,5,[0.1 0.02],[0.01 0.05],[0.015 0.015]);
 
-xRecon = A*diag(C(k,:))*F'*P(:,:,k)';
+
+[componentGraph,signs] = sortData(trueCell,estiCell,mleCell)
+
+
+compOrderTrue=1:M;%sortData(Atrue,Ctrue,Ftrue,Ptrue);
+compOrderEsti=componentGraph(:,1);%sortData(A,C,F,P);
+compOrderMLE=componentGraph(:,2);
+
 
 % ### X plot
-myImageTrue = X(:,:,k);
-myImageEsti = xRecon;
-
-if 0
-    colorInterval = findColorInterval(myImageTrue,myImageEsti);
-else
-    colorInterval = [];
-end
-
-figure(1)
-% subplot(2,5,1)
 axes(ha(1))
-titleText = strcat('Xk, k=',num2str(k));
-displayImageValues(myImageTrue,titleText,colorInterval)
+displayImageValues(trueCell{1}(:,:,k),strcat(titleTrueCell{1},num2str(k)),colorInterval)
 
-% subplot(2,5,6)
 axes(ha(6))
-titleText = strcat('Xk estimate, k =',num2str(k));
-displayImageValues(myImageEsti,titleText,colorInterval)
-
-% ### A Plot
-myImageTrue = Atrue;
-myImageEsti = A;
-
-if equalColorScale
-    colorInterval = findColorInterval(myImageTrue,myImageEsti);
-else
-    colorInterval = [];
-end
-
-% figure(3)
-% subplot(2,5,3)
-axes(ha(2))
-titleText = 'A True';
-displayImageValues(myImageTrue,titleText,colorInterval)
-
-% subplot(2,5,8)
-axes(ha(7))
-titleText = 'qA mean';
-displayImageValues(myImageEsti,titleText,colorInterval)
-
-
-
-% ### C Plot
-myImageTrue = diag(Ctrue(k,:));
-myImageEsti = diag(C(k,:));
-
-if equalColorScale
-    colorInterval = findColorInterval(myImageTrue,myImageEsti);
-else
-    colorInterval = [];
-end
-% figure(4)
-% subplot(2,5,4)
-axes(ha(3))
-titleText = 'diag(C_k True)';
-displayImageValues(myImageTrue,titleText,colorInterval)
-
-% subplot(2,5,9)
-axes(ha(8))
-titleText = 'diag(qC_k mean)';
-displayImageValues(myImageEsti,titleText,colorInterval)
-
-
-% ### F Plot
-myImageTrue = Ftrue';
-myImageEsti = F';
-
-if equalColorScale
-    colorInterval = findColorInterval(myImageTrue,myImageEsti);
-else
-    colorInterval = [];
-end
-
-% figure(2)
-% subplot(2,5,2)
-axes(ha(4))
-titleText = 'F True';
-displayImageValues(myImageTrue,titleText,colorInterval)
-
-% subplot(2,5,7)
-axes(ha(9))
-titleText = 'qF mean';
-displayImageValues(myImageEsti,titleText,colorInterval)
-
-% ### P Plot
-myImageTrue = Ptrue(:,:,k)';
-myImageEsti = P(:,:,k)';
-
-if equalColorScale
-    colorInterval = findColorInterval(myImageTrue,myImageEsti);
-else
-    colorInterval = [];
-end
-
-% figure(5)
-% subplot(2,5,5)
-axes(ha(5))
-titleText = 'Pk True';
-displayImageValues(myImageTrue,titleText,colorInterval)
-
-% subplot(2,5,10)
-axes(ha(10))
-titleText = 'qPk mean';
-displayImageValues(myImageEsti,titleText,colorInterval)
-
+displayImageValues(estiCell{1}(:,:,k),strcat(titleEstiCell{1},num2str(k)),colorInterval)
 
 if MLEflag
-    
-    
-    [A,F,C,P,fit]=parafac2(X,size(A,2),[0 0],[0 0 0 0 1]);
-    
-    P = cat(3,P{:});
-    
-    XreconMLE = A*diag(C(k,:))*F'*P(:,:,k)';
-    
-    
-    
-    % ### X Plot
-    myImageEsti = XreconMLE;
-    
     axes(ha(11))
-    titleText = 'Xk MLE';
-    displayImageValues(myImageEsti,titleText,colorInterval)
-    
-    
-    % ### A Plot
-    myImageEsti = A;
-    
-    axes(ha(12))
-    titleText = 'A MLE';
-    displayImageValues(myImageEsti,titleText,colorInterval)
-    
-    
-    % ### C Plot
-    myImageEsti = diag(C(k,:));
-    
-    axes(ha(13))
-    titleText = 'Ck MLE';
-    displayImageValues(myImageEsti,titleText,colorInterval)
-    
-    % ### A Plot
-    myImageEsti = F';
-    
-    axes(ha(14))
-    titleText = 'F MLE';
-    displayImageValues(myImageEsti,titleText,colorInterval)
-    
-    % ### A Plot
-    myImageEsti = P(:,:,k)';
-    
-    axes(ha(15))
-    titleText = 'Pk MLE';
-    displayImageValues(myImageEsti,titleText,colorInterval)
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+    displayImageValues(mleCell{1},titleMLECell{1},colorInterval)
 end
 
 
+% ### Others
+for i = 2:numel(trueCell)
+    
+    if all(i ~= [3,5])
+        myImageTrue = trueCell{i}(:,compOrderTrue);
+        myImageEsti = estiCell{i}(:,compOrderEsti)*diag(signs(1,:));
+        if MLEflag
+            myImageMLE = mleCell{i}(:,compOrderMLE)*diag(signs(2,:));
+        end
+    elseif i == 3
+        myImageTrue = diag(trueCell{i}(k,compOrderTrue));
+        myImageEsti = diag(estiCell{i}(k,compOrderEsti))*diag(signs(1,:));
+        if MLEflag
+            myImageMLE = diag(mleCell{i}(k,compOrderMLE))*diag(signs(2,:));
+        end
+    elseif i == 5
+        myImageTrue = trueCell{i}(:,compOrderTrue,k);
+        myImageEsti = estiCell{i}(:,compOrderEsti,k)*diag(signs(1,:));
+        if MLEflag
+            myImageMLE = mleCell{i}(:,compOrderMLE,k)*diag(signs(2,:));
+        end
+    end
+    
+    axes(ha(i))
+    displayImageValues(myImageTrue,titleTrueCell{i},colorInterval)
+    
+    axes(ha(i+5))
+    displayImageValues(myImageEsti,titleEstiCell{i},colorInterval)
+    
+    
+    if MLEflag
+        axes(ha(i+10))
+        displayImageValues(myImageMLE,titleMLECell{i},colorInterval)
+    end
+end
 
 
+end
 
 
+function [componentGraph,signs] = sortData(trueCell,estiCell,mleCell)
+
+M = size(trueCell{2},2);
+
+componentGraph = repmat((1:M)',1,2);
+signs = ones(2,M);
+
+for m = 1:M
+    trueSign = sign(trueCell{2}(:,m));%*diag(trueCell{3}(k,m))*trueCell{4}(:,m)');
+    for n = 1:M
+        estiSign = sign(estiCell{2}(:,n));%*diag(estiCell{3}(k,m))*estiCell{4}(:,m)');        
+        if all(trueSign~=estiSign)
+            componentGraph(m,1) = n;
+            signs(1,m) = -1;
+            break
+        elseif all(trueSign==estiSign)
+            componentGraph(m,1) = n;
+            break
+        end
+    end
+    for n = 1:M
+        if ~isempty(mleCell)
+            mleSign = sign(mleCell{2}(:,n));
+            if all(trueSign~=mleSign)
+                componentGraph(m,2) = n;
+                signs(2,m) = -1;
+                break
+            elseif all(trueSign==mleSign)
+                componentGraph(m,2) = n;
+                break
+            end
+            
+        end
+    end
+end
+
+end
 
 
+function signs = findSignComponent(k,trueCell,estiCell,mleCell)
+
+M = size(trueCell{2},2);
+
+signs = ones(2,M);
+
+for m = 1:M
+    trueSign = sign(trueCell{2}(:,m)*diag(trueCell{3}(k,m))*trueCell{4}(:,m)');
+    estiSign = sign(estiCell{2}(:,m)*diag(estiCell{3}(k,m))*estiCell{4}(:,m)');
+    
+    if all(all(trueSign~=estiSign))
+        signs(1,m) = -1;  
+    end
+end
 
 end

@@ -17,6 +17,8 @@ classdef dataClass < handle
         AlphaAtrue
         AlphaBtrue
         Mtrue % True number of components
+        
+        iter
     end
     
     properties

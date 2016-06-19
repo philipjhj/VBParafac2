@@ -3,13 +3,12 @@ classdef varBayesModelParafac2 < handle
     
     properties
         ELBO_chain
-        iter
         % Variational Distribution
         qDist
         
         % Settings
         verbose = 1; % 1, display, 0 hide everything
-        maxiter = intmax;
+        maxiter = 500;
     end
     properties
         data = dataClass;
@@ -19,12 +18,12 @@ classdef varBayesModelParafac2 < handle
         function obj = varBayesModelParafac2(X,M)
             % Summary of constructor
             
-            
+            rng(2)
             if nargin < 1
                 % Some dims to test
-                m = 4;
-                dim = 10;
-                k = 4;
+                m = 2;
+                dim = 5;
+                k = 5;
                 obj.data.M = m;
                 obj.data.Mtrue= m;
                 
@@ -73,10 +72,10 @@ classdef varBayesModelParafac2 < handle
             fprintf('\n') ;
             end
             % Update Variational Factors until ELBO has converged
-            obj.iter = 0;
+            obj.data.iter = 0;
             
             diff = ELBO-ELBO_prev;
-            while abs(diff)/abs(ELBO) > 1e-9 && obj.maxiter > obj.iter
+            while abs(diff)/abs(ELBO) > 1e-6 && obj.maxiter > obj.data.iter
                 
                 
                 % Update all variational factors
@@ -87,15 +86,15 @@ classdef varBayesModelParafac2 < handle
                 ELBO_prev = ELBO;
                 ELBO = obj.qDist.ELBO;
                 
-                if isempty(obj.ELBO_chain) || numel(obj.ELBO_chain)<obj.iter+1
+                if isempty(obj.ELBO_chain) || numel(obj.ELBO_chain)<obj.data.iter+1
                     obj.ELBO_chain = [obj.ELBO_chain zeros(1,100)];
                 end
-                obj.ELBO_chain(obj.iter+1) = ELBO;
+                obj.ELBO_chain(obj.data.iter+1) = ELBO;
                 
                 
 
                 diff = ELBO-ELBO_prev;
-                if obj.verbose && obj.iter ~= 0
+                if obj.verbose && obj.data.iter ~= 0
                 if diff < -1e-6 
                    fprintf('ELBO not converging; difference is %.4f \n',diff)
                    status=-1;
@@ -104,10 +103,10 @@ classdef varBayesModelParafac2 < handle
                 
                 % Output progress
                 % ...
-                fprintf('%5d',obj.iter);
+                fprintf('%5d',obj.data.iter);
                 obj.displayResultsAll(diff);
                 end
-                obj.iter = obj.iter+1;
+                obj.data.iter = obj.data.iter+1;
             end
             %fprintf('%5d',obj.iter);
             %obj.displayResults;

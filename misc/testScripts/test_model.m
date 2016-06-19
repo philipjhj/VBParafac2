@@ -5,14 +5,14 @@ load('/media/data/DataAndResults/Thesis/motor_normalized_all_subs.mat')
 myModel=varBayesModelParafac2;%(Y(:,:,:),30);
 myModel.qDist.debugflag = 0;
 myModel.verbose = 1;
-% myModel.qDist.method = 'vonmises';
-myModel.qDist.method = 'parafac2svd';
+myModel.qDist.method = 'vonmises';
+% myModel.qDist.method = 'parafac2svd';
 
 myModel.qDist.SNR
 
 % qA qC qF qP qSigma qAlpha
-myModel.qDist.activeParams = {'qA','qC','qF','qSigma','qAlpha','qP'};
-
+myModel.qDist.activeParams = {'qA','qF','qP','qAlpha','qSigma','qC'};
+% myModel.qDist.activeParams = {'qF'};
 
 
 myModel.computeVarDistribution;
@@ -26,10 +26,11 @@ myModel.computeVarDistribution
 
 %%
 
-for k = 1:myModel.data.K
+for k = 1:1
     clf
-    myModel.plotSolution(k,1) 
-   pause
+    
+    myModel.plotSolution(k,0)
+%    pause
 end
 
 
