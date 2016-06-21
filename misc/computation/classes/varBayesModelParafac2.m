@@ -3,7 +3,6 @@ classdef varBayesModelParafac2 < handle
     
     properties
         ELBO_chain
-        iter
         % Variational Distribution
         qDist
         
@@ -38,7 +37,7 @@ classdef varBayesModelParafac2 < handle
                 m = 2;
                 dim = 5;
                 k = 5;
-                obj.data.M = m;%m;
+                obj.data.M = m;
                 obj.data.Mtrue= m;
                 
                 obj.data.X = zeros([dim dim k]);
@@ -53,8 +52,15 @@ classdef varBayesModelParafac2 < handle
             obj.qDist = varDistributionC(obj);
             
         end
-%     
-%         
+        
+        
+        function restartqDist(obj)
+            
+            obj.qDist = varDistributionC(obj);
+            
+            
+        end
+        
         function status = computeVarDistribution(obj)
             % Implementation of CAVI to compute the variational distribution
             % of the probabilistic Parafac2 model
@@ -76,11 +82,10 @@ classdef varBayesModelParafac2 < handle
             fprintf('\n') ;
             end
             % Update Variational Factors until ELBO has converged
-            obj.iter = 0;
+            obj.data.iter = 0;
             
             diff = ELBO-ELBO_prev;
-            while abs(diff)/abs(ELBO) > 1e-6 && obj.maxiter > obj.iter
-                
+            while abs(diff)/abs(ELBO) > 1e-6 && obj.maxiter > obj.data.iter
                 
                 % Update all variational factors
                 obj.qDist.updateMoments;
@@ -90,15 +95,14 @@ classdef varBayesModelParafac2 < handle
                 ELBO_prev = ELBO;
                 ELBO = obj.qDist.ELBO;
                 
-                if isempty(obj.ELBO_chain) || numel(obj.ELBO_chain)<obj.iter+1
+                if isempty(obj.ELBO_chain) || numel(obj.ELBO_chain)<obj.data.iter+1
                     obj.ELBO_chain = [obj.ELBO_chain zeros(1,100)];
                 end
-                obj.ELBO_chain(obj.iter+1) = ELBO;
-                
+                obj.ELBO_chain(obj.data.iter+1) = ELBO;
                 
 
                 diff = ELBO-ELBO_prev;
-                if obj.verbose && obj.iter ~= 0
+                if obj.verbose && obj.data.iter ~= 0
                 if diff < -1e-6 
                    fprintf('ELBO not converging; difference is %.4f \n',diff)
                    status=-1;
@@ -107,10 +111,10 @@ classdef varBayesModelParafac2 < handle
                 
                 % Output progress
                 % ...
-                fprintf('%5d',obj.iter);
+                fprintf('%5d',obj.data.iter);
                 obj.displayResultsAll(diff);
                 end
-                obj.iter = obj.iter+1;
+                obj.data.iter = obj.data.iter+1;
             end
             %fprintf('%5d',obj.iter);
             %obj.displayResults;
@@ -159,9 +163,26 @@ classdef varBayesModelParafac2 < handle
         fprintf('\n')
         
         end
+        
+        
+        
+        % #### Plot functions
+        function plotSolution(obj,k,MLEflag)
+            
+            
+%             MLEflag = 1;
+           
+            plotParafac2SolutionK(k,obj.data.X,obj.qDist.qA.mean,obj.qDist.qC.mean,...
+                obj.qDist.qF.mean,obj.qDist.qP.mean,obj.data.Atrue,obj.data.Ctrue,...
+                obj.data.Ftrue,obj.data.Ptrue,MLEflag);
+            
+            
+        end
+        
+        
+        
+        
     end
-    
-    
     
     
     

@@ -2,6 +2,7 @@ classdef varDistributionC < handle
     properties (Access = private)
         % Data reference property
         data
+        
     end
     
     properties
@@ -25,7 +26,7 @@ classdef varDistributionC < handle
         % Settings
         method='manopt' % Method used to approximate E(qP)
         debugflag = 1
-        activeParams_opt %= {'qP','qF','qC','qA','qSigma','qAlpha'}
+        activeParams_opt = {'qA','qC','qF','qP','qSigma','qAlpha'}
     end
     
     properties (Dependent)
@@ -82,6 +83,7 @@ classdef varDistributionC < handle
             
             % Initialize Data
             obj.data = modelobj.data;
+%             obj.iter = modelobj.iter;
             
             obj.qA = multiNormalDist('qA',[obj.data.I obj.data.M],true);
             obj.qC = multiNormalDist('qC',[obj.data.K obj.data.M]);
@@ -89,7 +91,6 @@ classdef varDistributionC < handle
             obj.qP = multiNormalDist('qP',[obj.data.J obj.data.M obj.data.K],true);
             obj.qSigma = GammaDist('qSigma',[1 obj.data.K]);
             obj.qAlpha = GammaDist('qAlpha',[1 obj.data.M]);
-            
             
             obj.pSigma = GammaDist('pSigma',[1 obj.data.K]);
             obj.pAlpha = GammaDist('pAlpha',[1 obj.data.M]);
@@ -125,9 +126,8 @@ classdef varDistributionC < handle
                     obj.data.X(:,:,k) = obj.data.Atrue*diag(obj.data.Ctrue(k,:))*...
                         obj.data.Ftrue'*obj.data.Ptrue(:,:,k)'+obj.data.Etrue(:,:,k);
                 end
-                
-                
             end
+            
             obj.X = obj.data.X;
             obj.XInnerProduct = obj.computeXInnerProduct;
 %             
@@ -186,9 +186,6 @@ classdef varDistributionC < handle
 %                     obj.compute_eAiDFtPtPFDAi;
 % %                 end
 %             end
-
-            
-            
         end
         
         
@@ -554,6 +551,7 @@ classdef varDistributionC < handle
                 obj.ePtP = repmat(eye(obj.data.M),1,1,obj.data.K);
             else
                 obj.ePtP = obj.data.J*squeeze(obj.qP.variance)+repmat(eye(obj.data.M),1,1,obj.data.K);%repmat(eye(obj.data.M),1,1,obj.data.K);
+
             end
         end
         
