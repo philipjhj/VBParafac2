@@ -5,17 +5,17 @@ warning on MATLAB:nearlySingularMatrix
 
 % myModel=varBayesModelParafac2;
 
-I=10;
-J=I;
-K=10;
-M=2;
-dimensions = [I J K M];
-data = varBayesModelParafac2.generateDataFromModel([I J K M]);
-Mesti = 2;
-myModel=varBayesModelParafac2(data,Mesti);
+% I=15;
+% J=10;
+% K=12;
+% M=2;
+% dimensions = [I J K M];
+% data = varBayesModelParafac2.generateDataFromModel([I J K M]);
+% Mesti = 2;
+% myModel=varBayesModelParafac2(data,Mesti);
 
 
-% myModel=varBayesModelParafac2(Y(:,:,1:3),5);
+myModel=varBayesModelParafac2(Y,5);
 
 
 myModel.qDist.debugflag = 0;
@@ -27,7 +27,7 @@ myModel.qDist.SNR
 
 myModel.qDist.activeParams_opt = {'qA','qC','qP','qF','qSigma','qAlpha'};
 tic
-myModel.computeVarDistribution(500);
+myModel.computeVarDistribution(5);
 toc
 myModel.qDist.SNR
 

@@ -231,7 +231,7 @@ for k = 1:K
      % Replace missing with mean over slab (not optimal but what the heck)
      % Iteratively they'll be replaced with model estimates
      x(find(miss)) = mean(x(find(~miss)));
-     X{k} = x;
+     X(:,:,k) = x;
      MissNum = MissNum + prod(size(find(miss)));
      AllNum = AllNum + prod(size(x));
    end
@@ -257,7 +257,12 @@ if nargin<4
       Opt = Options;
       Opt = Options(1)/20;
       Opt(2) = NumItInRep; % Max NumItInRep iterations
-      Opt(3) = 1;  % Init with SVD
+      
+      if numel(X) > 1e6
+        Opt(3) = 2;
+      else
+        Opt(3) = 1;  % Init with SVD
+      end
       Opt(4) = 0;
       Opt(5) = 1;
       [A,H,C,P,bestfit]=obj.parafac2(Constraints,Opt);
@@ -306,13 +311,17 @@ if nargin<4
 end
 
 if initi~=1
-%    XtX=X{1}*X{1}'; % Calculate for evaluating fit (but if initi = 1 it has been calculated)
-%    for k = 2:K
-%       XtX = XtX + X{k}*X{k}';
-%    end
-   XtX = sum(mtimesx(X,X,'T'),3);
-end  
-fit    = sum(diag(XtX));
+    %    XtX=X{1}*X{1}'; % Calculate for evaluating fit (but if initi = 1 it has been calculated)
+    %    for k = 2:K
+    %       XtX = XtX + X{k}*X{k}';
+    %    end
+    diagXtXsum = 0;
+    
+    for i = 1:size(X,1)
+        diagXtXsum = diagXtXsum+ sum(mtimesx(X(i,:,:),X(i,:,:),'T'),3);
+    end
+end
+fit    = diagXtXsum;
 oldfit = fit*2;
 fit0   = fit;
 it     = 0;
