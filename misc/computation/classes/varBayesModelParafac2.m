@@ -103,7 +103,7 @@ classdef varBayesModelParafac2 < handle
             
             diff = ELBO-ELBO_prev;
             tic;
-            while abs(diff)/abs(ELBO) > 1e-6 && obj.maxiter > obj.data.iter
+            while abs(diff)/abs(ELBO) > 1e-7 && obj.maxiter > obj.data.iter
                 
                 % Update all variational factors
                 obj.qDist.updateMoments;

@@ -100,7 +100,7 @@ classdef varDistributionC < handle
             
             
             % Use same initialization as the original parafac2 code
-            [A,F,C,P]=parafac2(obj.data.X,obj.data.M,[0 0],[0, -1, 0,0,1]);
+            [A,F,C,P]=obj.parafac2([0 0],[0, -1, 0,0,1]);
             
             obj.qA.mean = A;
             obj.qC.mean = C;
@@ -153,6 +153,10 @@ classdef varDistributionC < handle
         function SNR(obj)
             disp(norm(obj.data.X(:))^2/norm(obj.data.Etrue(:))^2)
         end
+        
+        
+        [A,H,C,P,fit,AddiOutput] = parafac2(obj,Constraints,Options,A,H,C,P);
+        
         
         % #################################################################
         % # ELBO computations

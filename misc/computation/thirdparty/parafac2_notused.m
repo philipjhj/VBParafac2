@@ -445,7 +445,7 @@ if nargin<5
       Opt(3) = 1;  % Init with SVD
       Opt(4) = 0;
       Opt(5) = 1;
-      [A,H,C,P,bestfit]=parafac2(X,F,Constraints,Opt);
+%       [A,H,C,P,bestfit]=parafac2(X,F,Constraints,Opt);
       AllFit = bestfit;
       for i = 2:NumRep
          Opt(3) = 2;   % Init with random
