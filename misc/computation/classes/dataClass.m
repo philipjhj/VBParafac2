@@ -5,18 +5,18 @@ classdef dataClass < handle
         M
         
         % True latent variables (if generated)
-        Atrue
-        Ctrue
-        Ftrue
-        Ptrue
-        Etrue
-        Sigmatrue
-        SigmaAtrue
-        SigmaBtrue
-        Alphatrue
-        AlphaAtrue
-        AlphaBtrue
-        Mtrue % True number of components
+        Atrue = []
+        Ctrue = []
+        Ftrue = []
+        Ptrue = []
+        Etrue = []
+        Sigmatrue = []
+        SigmaAtrue = []
+        SigmaBtrue = []
+        Alphatrue = []
+        AlphaAtrue = []
+        AlphaBtrue = []
+        Mtrue = [] % True number of components
     end
     
     properties

@@ -1,8 +1,8 @@
 load('/media/data/DataAndResults/Thesis/motor_normalized_all_subs.mat')
 %%
-% warning off MATLAB:nearlySingularMatrix
+warning on MATLAB:nearlySingularMatrix
 
-myModel=varBayesModelParafac2;%(Y(:,:,:),30);
+myModel=varBayesModelParafac2;%(Y(:,:,:),25);
 
 myModel.qDist.debugflag = 0;
 myModel.verbose = 1;
@@ -38,8 +38,9 @@ myModel.qDist.activeParams_opt = {'qA','qC','qP','qF','qSigma','qAlpha'};
 % Rasmus bro's data
 % Hjernedata
 % Sammenlig med N-way toolbox'ens løsning
-
+tic;
 myModel.computeVarDistribution;
+toc
 myModel.qDist.SNR
 %%
 figure(2)

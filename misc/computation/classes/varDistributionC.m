@@ -8,7 +8,6 @@ classdef varDistributionC < handle
         
         
         % Probability Distributions
-        pX
         pSigma
         pAlpha
         
@@ -20,10 +19,7 @@ classdef varDistributionC < handle
         qSigma
         qAlpha
         
-        % Computed values
-        XInnerProduct
         
-        qPvonmisesEntropy
         
         
         % Settings
@@ -40,11 +36,15 @@ classdef varDistributionC < handle
         eQz
     end
     
-    properties %\(Access = private)
+    properties %(Access = private)
         % For updating moments, per k'th slab
         X
         eD
         qPmean
+        
+        % Computed values
+        XInnerProduct
+        qPvonmisesEntropy
         
         eCsquared
         ePtP
@@ -104,17 +104,17 @@ classdef varDistributionC < handle
                 
                 %                 obj.data.Sigmatrue = repmat(1e9,1,obj.data.K);
                 obj.data.Sigmatrue = repmat(1e6,1,obj.data.K);%gamrnd(obj.data.SigmaAtrue,obj.data.SigmaBtrue,1,obj.data.K);
-                obj.data.Alphatrue = repmat(1e-6,1,obj.data.M);%gamrnd(obj.data.AlphaAtrue,obj.data.AlphaBtrue,1,obj.data.Mtrue);
+                obj.data.Alphatrue = repmat(1e-6,1,obj.data.Mtrue);%gamrnd(obj.data.AlphaAtrue,obj.data.AlphaBtrue,1,obj.data.Mtrue);
                 
                 
                 obj.data.Atrue = 10*mvnrnd(zeros(obj.data.I,obj.data.Mtrue),eye(obj.data.Mtrue));
-                obj.data.Ftrue = 10*mvnrnd(zeros(obj.data.M,obj.data.Mtrue),eye(obj.data.Mtrue));
+                obj.data.Ftrue = 10*mvnrnd(zeros(obj.data.Mtrue,obj.data.Mtrue),eye(obj.data.Mtrue));
                 
                 obj.data.Ctrue = 10*mvnrnd(zeros(obj.data.K,obj.data.Mtrue),sqrt(1./obj.data.Alphatrue)*eye(obj.data.Mtrue));
                 
                 obj.data.Etrue = zeros(obj.data.I,obj.data.J,obj.data.K);
                 obj.data.X = zeros(obj.data.I,obj.data.J,obj.data.K);
-                obj.data.Ptrue = zeros(obj.data.J,obj.data.M,obj.data.K);
+                obj.data.Ptrue = zeros(obj.data.J,obj.data.Mtrue,obj.data.K);
                 
                 for k = 1:obj.data.K
                     
@@ -167,6 +167,26 @@ classdef varDistributionC < handle
 %             obj.qAlpha.mean = obj.data.Alphatrue;
 %             obj.qSigma.mean = obj.data.Sigmatrue;
             
+
+%             for i = 1:numel(all_params)
+%                 methodStr = strcat('update',all_params{i});
+%                 obj.(methodStr);
+%                 obj.(all_params{i}).updateStatistics;
+%                 
+% %                 if strcmp(obj.activeParams{i},'qP')
+%                     obj.compute_ePtP;
+% %                 elseif strcmp(obj.activeParams{i},'qF')
+%                     obj.compute_eFtPtPF;
+% %                 elseif strcmp(obj.activeParams{i},'qC')
+%                     obj.compute_eD;
+%                     obj.compute_eCtC;
+%                     obj.compute_eCsquared;
+%                     obj.compute_eDFtPtPFD;
+% %                 elseif strcmp(obj.activeParams{i},'qA')
+%                     obj.compute_eAiDFtPtPFDAi;
+% %                 end
+%             end
+
             
             
         end
@@ -244,7 +264,7 @@ classdef varDistributionC < handle
             t3sum = sum(sum(sum(multiplyTensor(t3,obj.qSigma.mean),3).*obj.qA.mean));
             
             obj.qXMeanLog = obj.data.J/2*sum(obj.qSigma.mean)-1/2*sum(obj.qSigma.mean.*(...
-                sum(obj.eAiDFtPtPFDAi)+sum(obj.XInnerProduct)))+t3sum;
+                sum(obj.eAiDFtPtPFDAi)+obj.XInnerProduct))+t3sum;
         end
         
         function computeqAMeanLog(obj)
@@ -494,7 +514,7 @@ classdef varDistributionC < handle
                 %                 check_ELBO(obj,ELBO_prev,obj.qSigma.varname,'beta')
             end
             obj.qSigma.beta = obj.pSigma.beta+1./(1/2*sum(obj.eAiDFtPtPFDAi,1)...
-                    +1/2*sum(obj.XInnerProduct)...
+                    +1/2*obj.XInnerProduct...
                     -squeeze(sum(sum(...
                     bsxfun(@times,...
                     mtimesx(obj.qA.mean,mtimesx(obj.eD,mtimesx(obj.qF.mean',permute(obj.qP.mean,[2 1 3]))))...
@@ -590,11 +610,11 @@ classdef varDistributionC < handle
         
         function value = computeXInnerProduct(obj)
             value = zeros(1,obj.data.K);
-            for i = 1:obj.data.I
+%             for i = 1:obj.data.I
                 for k = 1:obj.data.K
-                    value(i,k) = sum(obj.data.X(i,:,k).^2);
+                    value(k) = sum(sum(obj.data.X(:,:,k).^2));
                 end
-            end
+%             end
         end
         
         % #################################################################

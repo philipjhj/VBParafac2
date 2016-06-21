@@ -11,21 +11,34 @@ classdef varBayesModelParafac2 < handle
         verbose = 1; % 1, display, 0 hide everything
         maxiter = 500;%intmax;
     end
-    properties (Constant)
+    properties
         data = dataClass;
     end
     
     methods
+        
+        function obj = saveobj(obj)
+            obj.data.X = [];
+            disp(obj.data.X)
+        end
+        
+        function obj = loadobj(obj)
+            m=matfile('/media/data/DataAndResults/Thesis/motor_normalized_all_subs.mat');
+            obj.data.X = m.Y;
+        end
+        
+        
         function obj = varBayesModelParafac2(X,M)
             % Summary of constructor
             
+%             mtimesx('SPEED');
             rng(2)
             if nargin < 1
                 % Some dims to test
                 m = 2;
                 dim = 5;
                 k = 5;
-                obj.data.M = m;
+                obj.data.M = m;%m;
                 obj.data.Mtrue= m;
                 
                 obj.data.X = zeros([dim dim k]);
@@ -66,7 +79,7 @@ classdef varBayesModelParafac2 < handle
             obj.iter = 0;
             
             diff = ELBO-ELBO_prev;
-            while abs(diff)/abs(ELBO) > 1e-9 && obj.maxiter > obj.iter
+            while abs(diff)/abs(ELBO) > 1e-6 && obj.maxiter > obj.iter
                 
                 
                 % Update all variational factors
@@ -137,14 +150,19 @@ classdef varBayesModelParafac2 < handle
             %             fprintf('eQz: %f \n',obj.qDist.eQz);
             %                   obj.qDist.ELBO,obj.qDist.ePxz,obj.qDist.eQz,...
             fprintf('%10.2e',...
-                diff,...
-            obj.qDist.qXMeanLog,obj.qDist.qAMeanLog,obj.qDist.qCMeanLog,...
-            obj.qDist.qFMeanLog,obj.qDist.qPMeanLog,obj.qDist.qSigmaMeanLog,...
-            obj.qDist.qAlphaMeanLog,obj.qDist.qAEntropy,obj.qDist.qCEntropy,...
-            obj.qDist.qFEntropy,obj.qDist.qPEntropy,obj.qDist.qSigmaEntropy,...
-            obj.qDist.qAlphaEntropy)
+                diff,obj.qDist.ELBO)%...
+%             obj.qDist.qXMeanLog,obj.qDist.qAMeanLog,obj.qDist.qCMeanLog,...
+%             obj.qDist.qFMeanLog,obj.qDist.qPMeanLog,obj.qDist.qSigmaMeanLog,...
+%             obj.qDist.qAlphaMeanLog,obj.qDist.qAEntropy,obj.qDist.qCEntropy,...
+%             obj.qDist.qFEntropy,obj.qDist.qPEntropy,obj.qDist.qSigmaEntropy,...
+%             obj.qDist.qAlphaEntropy)
         fprintf('\n')
         
         end
     end
+    
+    
+    
+    
+    
 end

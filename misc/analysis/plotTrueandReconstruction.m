@@ -24,6 +24,9 @@ title(sprintf('variance %e',sqrt(myModel.qDist.qSigma.mean(k))))
 % imagesc(myModel.data.Etrue(:,:,k))
 % colorbar
 % title('true error')
+pause
+end
+%%
 
 figure(2)
 subplot(2,1,1)

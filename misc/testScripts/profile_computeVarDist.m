@@ -1,3 +1,6 @@
+load('/media/data/DataAndResults/Thesis/motor_normalized_all_subs.mat')
+%%
+
 
  profile on
 tic;
