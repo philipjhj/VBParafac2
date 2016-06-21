@@ -19,14 +19,8 @@ classdef varBayesModelParafac2 < handle
         
         function obj = saveobj(obj)
             obj.data.X = [];
-            disp(obj.data.X)
+            obj.qDist.eAiDFtPtPFDAi = [];
         end
-        
-        function obj = loadobj(obj)
-            m=matfile('/media/data/DataAndResults/Thesis/motor_normalized_all_subs.mat');
-            obj.data.X = m.Y;
-        end
-        
         
         function obj = varBayesModelParafac2(X,M)
             % Summary of constructor
@@ -227,6 +221,13 @@ classdef varBayesModelParafac2 < handle
     end
     
     methods (Static)
+        
+        function obj = loadobj(obj)
+            m=matfile('/media/data/DataAndResults/Thesis/motor_normalized_all_subs.mat');
+            obj.data.X = m.Y;
+            obj.qDist.compute_eAiDFtPtPFDAi;
+        end
+        
         
         function generatedData = generateDataFromModel(dimensions)
             rng('default')

@@ -36,9 +36,7 @@ classdef varDistributionC < handle
     
     properties %(Access = private)
         % For updating moments, per k'th slab
-        X
         eD
-        qPmean
         
         % Computed values
         XInnerProduct
@@ -95,17 +93,17 @@ classdef varDistributionC < handle
             
             obj.pAlpha.alpha = obj.pAlpha.alpha;
             
-            obj.X = obj.data.X;
+           
             obj.XInnerProduct = obj.computeXInnerProduct;
             
             
             % Use same initialization as the original parafac2 code
-            [A,F,C,P]=obj.parafac2([0 0],[0, -1, 0,0,1]);
-            
-            obj.qA.mean = A;
-            obj.qC.mean = C;
-            obj.qF.mean = F;
-            obj.qP.mean = cat(3,P{:});
+%             [A,F,C,P]=obj.parafac2([0 0],[0, -1, 0,0,1]);
+%             
+%             obj.qA.mean = A;
+%             obj.qC.mean = C;
+%             obj.qF.mean = F;
+%             obj.qP.mean = cat(3,P{:});
             
             %
             % Initialize Sufficient Stats
@@ -351,10 +349,10 @@ classdef varDistributionC < handle
                         obj.qA.meanOuterProduct))+eye(obj.data.M));
                 end
             end
-            obj.qPmean;
+            obj.computeqPmean;
         end
         
-        function obj = get.qPmean(obj)
+        function computeqPmean(obj)
             if strcmp(obj.method,'manopt')
                 
                 manifold = stiefelfactory(obj.data.J,obj.data.M);

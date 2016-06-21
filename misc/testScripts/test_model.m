@@ -34,7 +34,7 @@ myModel.qDist.SNR
 
 %%
 clf
-myModel.plotSolutionSynthK(2,1)
+myModel.plotSolutionSynthK(2,0)
 
 
 %%
