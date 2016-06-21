@@ -20,11 +20,8 @@ classdef varDistributionC < handle
         qSigma
         qAlpha
         
-        
-        
-        
         % Settings
-        method='manopt' % Method used to approximate E(qP)
+        method='parafac2svd' % Method used to approximate E(qP)
         debugflag = 1
         activeParams_opt = {'qA','qC','qF','qP','qSigma','qAlpha'}
     end
@@ -71,7 +68,8 @@ classdef varDistributionC < handle
         qPEntropy
         qSigmaEntropy
         qAlphaEntropy
-        
+    end
+    properties (Access = protected)
         activeParams = {'qP','qF','qC','qA','qSigma','qAlpha'}
     end
     
@@ -83,7 +81,7 @@ classdef varDistributionC < handle
             
             % Initialize Data
             obj.data = modelobj.data;
-%             obj.iter = modelobj.iter;
+            %             obj.iter = modelobj.iter;
             
             obj.qA = multiNormalDist('qA',[obj.data.I obj.data.M],true);
             obj.qC = multiNormalDist('qC',[obj.data.K obj.data.M]);
@@ -97,44 +95,19 @@ classdef varDistributionC < handle
             
             obj.pAlpha.alpha = obj.pAlpha.alpha;
             
-            if sum(sum(sum(obj.data.X)))==0
-                obj.data.SigmaAtrue = 1;
-                obj.data.SigmaBtrue = 1;
-                obj.data.AlphaAtrue = 1;
-                obj.data.AlphaBtrue = 1;
-                
-                %                 obj.data.Sigmatrue = repmat(1e9,1,obj.data.K);
-                obj.data.Sigmatrue = repmat(1e6,1,obj.data.K);%gamrnd(obj.data.SigmaAtrue,obj.data.SigmaBtrue,1,obj.data.K);
-                obj.data.Alphatrue = repmat(1e-6,1,obj.data.Mtrue);%gamrnd(obj.data.AlphaAtrue,obj.data.AlphaBtrue,1,obj.data.Mtrue);
-                
-                
-                obj.data.Atrue = 10*mvnrnd(zeros(obj.data.I,obj.data.Mtrue),eye(obj.data.Mtrue));
-                obj.data.Ftrue = 10*mvnrnd(zeros(obj.data.Mtrue,obj.data.Mtrue),eye(obj.data.Mtrue));
-                
-                obj.data.Ctrue = 10*mvnrnd(zeros(obj.data.K,obj.data.Mtrue),sqrt(1./obj.data.Alphatrue)*eye(obj.data.Mtrue));
-                
-                obj.data.Etrue = zeros(obj.data.I,obj.data.J,obj.data.K);
-                obj.data.X = zeros(obj.data.I,obj.data.J,obj.data.K);
-                obj.data.Ptrue = zeros(obj.data.J,obj.data.Mtrue,obj.data.K);
-                
-                for k = 1:obj.data.K
-                    
-                    obj.data.Ptrue(:,:,k) = orth(mvnrnd(zeros(obj.data.J,obj.data.Mtrue),eye(obj.data.Mtrue)));
-                
-                    obj.data.Etrue(:,:,k) = mvnrnd(zeros(obj.data.I,obj.data.J)...
-                        ,eye(obj.data.J)*sqrt(1./obj.data.Sigmatrue(k)));
-                    obj.data.X(:,:,k) = obj.data.Atrue*diag(obj.data.Ctrue(k,:))*...
-                        obj.data.Ftrue'*obj.data.Ptrue(:,:,k)'+obj.data.Etrue(:,:,k);
-                end
-            end
-            
             obj.X = obj.data.X;
             obj.XInnerProduct = obj.computeXInnerProduct;
-%             
             
             
+            % Use same initialization as the original parafac2 code
+            [A,F,C,P]=parafac2(obj.data.X,obj.data.M,[0 0],[0, -1, 0,0,1]);
             
+            obj.qA.mean = A;
+            obj.qC.mean = C;
+            obj.qF.mean = F;
+            obj.qP.mean = cat(3,P{:});
             
+            %
             % Initialize Sufficient Stats
             obj.compute_eD;
             obj.compute_eCtC;
@@ -152,7 +125,6 @@ classdef varDistributionC < handle
                 obj.(all_params{i}).updateStatistics;
                 
                 methodStr = strcat('compute',all_params{i},'MeanLog');
-%                 disp(methodStr)
                 obj.(methodStr);
                 
                 methodStr = strcat(all_params{i},'Entropy');
@@ -160,32 +132,14 @@ classdef varDistributionC < handle
                 
             end
             
-%             obj.qA.mean = obj.data.Atrue;
-%             obj.qC.mean = obj.data.Ctrue;
-% %             obj.qF.mean = obj.data.Ftrue;
-%             obj.qP.mean = obj.data.Ptrue;
-%             obj.qAlpha.mean = obj.data.Alphatrue;
-%             obj.qSigma.mean = obj.data.Sigmatrue;
+            %             obj.qA.mean = obj.data.Atrue;
+            %             obj.qC.mean = obj.data.Ctrue;
+            % %             obj.qF.mean = obj.data.Ftrue;
+            %             obj.qP.mean = obj.data.Ptrue;
+            %             obj.qAlpha.mean = obj.data.Alphatrue;
+            %             obj.qSigma.mean = obj.data.Sigmatrue;
             
-
-%             for i = 1:numel(all_params)
-%                 methodStr = strcat('update',all_params{i});
-%                 obj.(methodStr);
-%                 obj.(all_params{i}).updateStatistics;
-%                 
-% %                 if strcmp(obj.activeParams{i},'qP')
-%                     obj.compute_ePtP;
-% %                 elseif strcmp(obj.activeParams{i},'qF')
-%                     obj.compute_eFtPtPF;
-% %                 elseif strcmp(obj.activeParams{i},'qC')
-%                     obj.compute_eD;
-%                     obj.compute_eCtC;
-%                     obj.compute_eCsquared;
-%                     obj.compute_eDFtPtPFD;
-% %                 elseif strcmp(obj.activeParams{i},'qA')
-%                     obj.compute_eAiDFtPtPFDAi;
-% %                 end
-%             end
+            
         end
         
         
@@ -248,7 +202,7 @@ classdef varDistributionC < handle
         % #################################################################
         % Mean values for ELBO
         function computeqXMeanLog(obj)
-        
+            
             t3 = zeros(obj.data.I,obj.data.M,obj.data.K);
             
             dataX = obj.data.X;
@@ -270,7 +224,7 @@ classdef varDistributionC < handle
         
         function computeqCMeanLog(obj)
             if isempty(obj.qAlpha.entropy)
-                 obj.qAlpha.updateStatistics;
+                obj.qAlpha.updateStatistics;
             end
             obj.qCMeanLog = 1/2*sum(obj.qAlpha.mean)-1/2*trace(obj.qC.mean*diag(obj.qAlpha.mean)*obj.qC.mean');
         end
@@ -330,42 +284,22 @@ classdef varDistributionC < handle
             qPMeanT = permute(obj.qP.mean,[2 1 3]);
             dataXT = permute(obj.data.X,[2 1 3]);
             
-            %             qAmean = obj.qA.mean;
             qAvariance = obj.qA.variance;
             
             K = obj.data.K;
-            
-            %             for i = 1:obj.data.I
-            %
-            %                 sum_k=0;
-            %
-            %                 for k = 1:K
-            %                     sum_k = sum_k + qSigmaMean(k)*qD(:,:,k)*qFMeanT*qPMeanT(:,:,k)*dataXT(:,i,k);
-            %                 end
-            %
-            %
-            %
-            %                 qAmean(i,:) = (qAvariance*sum_k)';
-            %             end
-            
             sum_k = sum(mtimesx(reshape(qSigmaMean,1,1,obj.data.K),mtimesx(mtimesx(mtimesx(qD,qFMeanT),qPMeanT),dataXT)),3);
             obj.qA.mean = (qAvariance*sum_k)';
-            %             obj.qA.mean = qAmean;
             
         end
         
         % ### Variational Factor C
         function updateqC(obj)
-            %             sum_k = 0;
             for k = 1:obj.data.K
-                %                 ELBO_prev = obj.ELBO;
+                
                 obj.qC.variance(:,:,k) = inv(obj.qSigma.mean(k)*obj.qA.meanOuterProduct.*obj.eFtPtPF(:,:,k) + diag(obj.qAlpha.mean));
-                %                 sum_k = sum_k+check_ELBO(obj,ELBO_prev,obj.qC.varname,'variance',obj.debugflag);
-                %                 ELBO_prev = obj.ELBO;
+                
                 obj.qC.mean(k,:) = obj.qSigma.mean(k)*diag(obj.qF.mean'*obj.qP.mean(:,:,k)'*obj.data.X(:,:,k)'*obj.qA.mean)'*obj.qC.variance(:,:,k);
-                %                 sum_k = sum_k+check_ELBO(obj,ELBO_prev,obj.qC.varname,'mean',obj.debugflag);
             end
-            %             disp(sum_k)
         end
         
         % ### Variational Factor F
@@ -397,31 +331,11 @@ classdef varDistributionC < handle
                 t1=sum(mtimesx(reshape(obj.qSigma.mean,1,1,obj.data.K),...
                     mtimesx(bsxfun(@times,obj.eCtC,obj.qA.meanOuterProduct),...
                     sum(bsxfun(@times,obj.ePtP(m,allButM,:),tempMean(allButM,:)'),2))),3)';
-                %                             sum(repmat(,1,obj.data.M).*,1)')';
-                
-                %                                     t2=sum(mtimesx(reshape(obj.qSigma.mean,1,1,2),...
-                %                                         mtimesx(permute(obj.qP.mean(:,m,:),[2 1 3]),...
-                %                                         mtimesx(permute(obj.data.X,[2 1 3]),...
-                %                                         mtimesx(obj.qA.mean,obj.eD)))),3);
-                
                 
                 obj.qF.mean(m,:) = (t2(:,m)'-t1)*obj.qF.variance(:,:,m);
             end
             
             
-            %                 for m = 1:obj.data.M
-            %                     allButM = 1:obj.data.M~=m;
-            %                     t1=squeeze(sum(mtimesx(reshape(obj.qSigma.mean,1,1,2),...
-            %                         mtimesx(bsxfun(@times,obj.eCtC,obj.qA.meanOuterProduct),...
-            %                         sum(bsxfun(@times,permute(obj.ePtP(:,allButM,:),[4 2 3 1]),tempMean(allButM,:)'),2))),3));
-            %
-            %                     t2=squeeze(sum(mtimesx(reshape(obj.qSigma.mean,1,1,2),...
-            %                         mtimesx(permute(obj.qP.mean,[4 1 3 2]),...
-            %                         mtimesx(permute(obj.data.X,[2 1 3]),...
-            %                         mtimesx(obj.qA.mean,obj.eD)))),3));
-            %
-            %                     obj.qF.mean = squeeze(mtimesx(reshape(t2-t1,1,obj.data.M,obj.data.M),obj.qF.variance))';
-            %                 end
             
         end
         % ### Variational Factor P
@@ -443,7 +357,6 @@ classdef varDistributionC < handle
                 problem.M = manifold;
                 problem.cost = @costFunc;
                 problem.egrad = @gradFunc;
-                %                 k=1;
                 %                 checkgradient(problem)
                 warning('off', 'manopt:getHessian:approx')
                 options.verbosity=0;
@@ -455,11 +368,11 @@ classdef varDistributionC < handle
                     gradconstant=(obj.qF.mean*obj.eD(:,:,k)*obj.qA.mean'*obj.data.X(:,:,k))';
                     costconstant=obj.qF.mean*obj.eD(:,:,k)*obj.qA.mean'*obj.data.X(:,:,k);%*obj.qP.mean(:,:,k);
                     
-                    %                     cost = costFunc(obj.qP.mean(:,:,k));
+                    % cost = costFunc(obj.qP.mean(:,:,k));
                     
                     
                     [x,~] = trustregions(problem,[],options);
-                    %                     fprintf('\n Slab %d with cost diff: %.2f \n',k,cost-xcost)
+                    % fprintf('\n Slab %d with cost diff: %.2f \n',k,cost-xcost)
                     obj.qP.mean(:,:,k) = x;
                     
                 end
@@ -467,9 +380,9 @@ classdef varDistributionC < handle
             elseif strcmp(obj.method,'vonmises')
                 obj.qPvonmisesEntropy = 0;
                 for k=1:obj.data.K
-                    A = obj.qA.mean*obj.eD(:,:,k)*obj.qF.mean'; %U(:,1:D)*S(1:D,1:D);
+                    A = obj.qA.mean*obj.eD(:,:,k)*obj.qF.mean';
                     
-                    % Estep - this step can be adapted directly to PARAFAC2 VB
+                    % Estep
                     F=A'*obj.data.X(:,:,k)/obj.qSigma.mean(k); %/sigma_sq;
                     [UU,SS,VV]=svd(F,'econ');
                     [f,~,lF]=hyperg(obj.data.J,diag(SS),3);
@@ -503,20 +416,13 @@ classdef varDistributionC < handle
             for k = 1:obj.data.K
                 %ELBO_prev = obj.ELBO;
                 obj.qSigma.alpha(k) = obj.pSigma.alpha(k)+obj.data.J*obj.data.I/2;
-                %                 check_ELBO(obj,ELBO_prev,obj.qSigma.varname,'alpha')
-                %ELBO_prev = obj.ELBO;
-%                 obj.qSigma.beta(k) = obj.pSigma.beta(k)+1/(1/2*sum(obj.eAiDFtPtPFDAi(:,k))...
-%                     +1/2*sum(obj.XInnerProduct)...
-%                     -sum(sum(obj.qA.mean*obj.eD(:,:,k)*obj.qF.mean'*obj.qP.mean(:,:,k)'.*obj.data.X(:,:,k))));
-                %                 check_ELBO(obj,ELBO_prev,obj.qSigma.varname,'beta')
             end
             obj.qSigma.beta = obj.pSigma.beta+1./(1/2*sum(obj.eAiDFtPtPFDAi,1)...
-                    +1/2*obj.XInnerProduct...
-                    -squeeze(sum(sum(...
-                    bsxfun(@times,...
-                    mtimesx(obj.qA.mean,mtimesx(obj.eD,mtimesx(obj.qF.mean',permute(obj.qP.mean,[2 1 3]))))...
-                    ,obj.data.X),1),2))');
-%                     -mtimesx(obj.qA.mean,mtimesx(obj.eD,mtimesx(obj.qF.mean',mtimesx(obj.qP.mean',obj.data.X')))));
+                +1/2*obj.XInnerProduct...
+                -squeeze(sum(sum(...
+                bsxfun(@times,...
+                mtimesx(obj.qA.mean,mtimesx(obj.eD,mtimesx(obj.qF.mean',permute(obj.qP.mean,[2 1 3]))))...
+                ,obj.data.X),1),2))');
         end
         
         % ### Variational Factor Alpha
@@ -551,7 +457,7 @@ classdef varDistributionC < handle
                 obj.ePtP = repmat(eye(obj.data.M),1,1,obj.data.K);
             else
                 obj.ePtP = obj.data.J*squeeze(obj.qP.variance)+repmat(eye(obj.data.M),1,1,obj.data.K);%repmat(eye(obj.data.M),1,1,obj.data.K);
-
+                
             end
         end
         
@@ -598,21 +504,14 @@ classdef varDistributionC < handle
         end
         
         function compute_eAiDFtPtPFDAi(obj)
-            %             expected = obj.qA.computeMeanInnerProductScaledSlabs(obj.eDFtPtPFD);
-            %             value = zeros(obj.data.I,obj.data.K);
-            %             for k = 1:obj.data.K
-            %                 value(:,k) = diag(expected(:,:,k));
-            %             end
             obj.eAiDFtPtPFDAi = obj.qA.computeMeanInnerProductScaledSlabs(obj.eDFtPtPFD,1);
         end
         
         function value = computeXInnerProduct(obj)
             value = zeros(1,obj.data.K);
-%             for i = 1:obj.data.I
-                for k = 1:obj.data.K
-                    value(k) = sum(sum(obj.data.X(:,:,k).^2));
-                end
-%             end
+            for k = 1:obj.data.K
+                value(k) = sum(sum(obj.data.X(:,:,k).^2));
+            end
         end
         
         % #################################################################

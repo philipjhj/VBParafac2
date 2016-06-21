@@ -10,7 +10,7 @@ load example_data
 plotComponent(W,Z,mask,mask_dim)
 
 %% Plotting a subset or using variable arguments
-subset = 1:3;
+subset = 1:5;
 plotComponent(W(:,subset),Z(subset,:,:),mask,mask_dim,...,)
             'inConvention','Radiological',... %Input convention (i.e. data)
             'outConvention','Neurological',...%Output convention

@@ -6,7 +6,8 @@ function [A,H,C,P,fit,AddiOutput]=parafac2(X,F,Constraints,Options,A,H,C,P);
 %                  THE PARAFAC2 MODEL
 %     ___________________________________________________
 % 
-%%
+%
+%
 % Algorithm to fit the PARAFAC2 model which is an advanced variant of the 
 % normal PARAFAC1 model. It handles slab-wise deviations between components
 % in one mode as long as the cross-product of the components stays 
@@ -148,14 +149,31 @@ function [A,H,C,P,fit,AddiOutput]=parafac2(X,F,Constraints,Options,A,H,C,P);
 
 
 
-if nargin==0   disp(' ')   disp(' ')   disp(' THE PARAFAC2 MODEL')   disp(' ')   disp(' Type <<help parafac2>> for more info')   disp('  ')
+if nargin==0
+   disp(' ')
+   disp(' ')
+   disp(' THE PARAFAC2 MODEL')
+   disp(' ')
+   disp(' Type <<help parafac2>> for more info')
+   disp('  ')
    disp(' I/O ')
    disp(' [A,H,C,P]=parafac2(X,F);')
-   disp(' ')   disp(' Or optionally')
-   disp(' ')   disp(' [A,H,C,P,fit]=parafac2(X,F,Constraints,Options);')   disp(' ')   disp(' Options=[Crit MaxIt Init Xval Show]')   disp(' ')   disp(' ')   return
- elseif nargin<2&~all(X=='demo')
-    error(' The inputs X and F must be given')
- end
+   disp(' ')
+   disp(' Or optionally')
+   disp(' ')
+   disp(' [A,H,C,P,fit]=parafac2(X,F,Constraints,Options);')
+   disp(' ')
+   disp(' Options=[Crit MaxIt Init Xval Show]')
+   disp(' ')
+   disp(' ')
+   return
+
+ elseif nargin<2&~all(X=='demo')
+
+    error(' The inputs X and F must be given')
+
+ end
+
  
   if isstr(X) & all(X=='demo')
     F=3;
@@ -250,6 +268,8 @@ end
 % Maximal number of iterations 
 if Options(2)==0
    MaxIt = 2000;
+elseif Options(2) == -1;
+    MaxIt = 0;
 else
    MaxIt = Options(2);
 end

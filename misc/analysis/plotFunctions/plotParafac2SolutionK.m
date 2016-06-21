@@ -2,11 +2,12 @@ function plotParafac2SolutionK(k,X,A,C,F,P,Atrue,Ctrue,Ftrue,Ptrue,MLEflag,Etrue
 
 
 M = size(A,2);
+Mtrue = size(Atrue,2);
 
 xRecon = A*diag(C(k,:))*F'*P(:,:,k)';
 
-estiCell = {X,A,C,F,P};
-trueCell = {xRecon,Atrue,Ctrue,Ftrue,Ptrue};
+estiCell = {xRecon,A,C,F,P};
+trueCell = {X,Atrue,Ctrue,Ftrue,Ptrue};
 
 
 titleTrueCell ={'Xk, k=',
@@ -23,7 +24,7 @@ titleEstiCell = {'Xk estimate, k =',
     'qPk mean'};
 
 if MLEflag
-    [A_MLE,F_MLE,C_MLE,P_MLE,~]=parafac2(X,size(A,2),[0 0],[0 0 0 0 1]);
+    [A_MLE,F_MLE,C_MLE,P_MLE,~]=parafac2(X,M,[0 0],[0 0 0 0 1]);
     
     P_MLE = cat(3,P_MLE{:});
     
@@ -66,20 +67,26 @@ end
 ha=tight_subplot(nRows,5,[0.1 0.02],[0.01 0.05],[0.015 0.015]);
 
 
-[componentGraph,signs] = sortData(trueCell,estiCell,mleCell)
+if M == Mtrue;
+[componentGraph,signs] = sortData(trueCell,estiCell,mleCell);
 
 
-compOrderTrue=1:M;%sortData(Atrue,Ctrue,Ftrue,Ptrue);
-compOrderEsti=componentGraph(:,1);%sortData(A,C,F,P);
-compOrderMLE=componentGraph(:,2);
-
+    compOrderTrue=1:Mtrue;%sortData(Atrue,Ctrue,Ftrue,Ptrue);
+    compOrderEsti=componentGraph(:,1);
+    compOrderMLE=componentGraph(:,2);
+else
+    compOrderTrue=1:Mtrue;
+    compOrderEsti=1:M;
+    compOrderMLE=1:M;
+    signs = ones(2,M);
+end
 
 % ### X plot
 axes(ha(1))
 displayImageValues(trueCell{1}(:,:,k),strcat(titleTrueCell{1},num2str(k)),colorInterval)
 
 axes(ha(6))
-displayImageValues(estiCell{1}(:,:,k),strcat(titleEstiCell{1},num2str(k)),colorInterval)
+displayImageValues(estiCell{1},strcat(titleEstiCell{1},num2str(k)),colorInterval)
 
 if MLEflag
     axes(ha(11))
@@ -129,12 +136,13 @@ end
 
 function [componentGraph,signs] = sortData(trueCell,estiCell,mleCell)
 
-M = size(trueCell{2},2);
+Mtrue = size(trueCell{2},2);
+M = size(estiCell{2},2);
 
 componentGraph = repmat((1:M)',1,2);
 signs = ones(2,M);
 
-for m = 1:M
+for m = 1:Mtrue
     trueSign = sign(trueCell{2}(:,m));%*diag(trueCell{3}(k,m))*trueCell{4}(:,m)');
     for n = 1:M
         estiSign = sign(estiCell{2}(:,n));%*diag(estiCell{3}(k,m))*estiCell{4}(:,m)');        
@@ -160,24 +168,6 @@ for m = 1:M
             end
             
         end
-    end
-end
-
-end
-
-
-function signs = findSignComponent(k,trueCell,estiCell,mleCell)
-
-M = size(trueCell{2},2);
-
-signs = ones(2,M);
-
-for m = 1:M
-    trueSign = sign(trueCell{2}(:,m)*diag(trueCell{3}(k,m))*trueCell{4}(:,m)');
-    estiSign = sign(estiCell{2}(:,m)*diag(estiCell{3}(k,m))*estiCell{4}(:,m)');
-    
-    if all(all(trueSign~=estiSign))
-        signs(1,m) = -1;  
     end
 end
 

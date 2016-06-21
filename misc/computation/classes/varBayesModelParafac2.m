@@ -3,12 +3,13 @@ classdef varBayesModelParafac2 < handle
     
     properties
         ELBO_chain
+        evaltime
         % Variational Distribution
         qDist
         
         % Settings
         verbose = 1; % 1, display, 0 hide everything
-        maxiter = 500;%intmax;
+        maxiter
     end
     properties
         data = dataClass;
@@ -31,16 +32,22 @@ classdef varBayesModelParafac2 < handle
             % Summary of constructor
             
 %             mtimesx('SPEED');
-            rng(2)
+            
             if nargin < 1
                 % Some dims to test
-                m = 2;
-                dim = 5;
-                k = 5;
-                obj.data.M = m;
-                obj.data.Mtrue= m;
+                I = 5;
+                J = I;
+                K = 5;
                 
-                obj.data.X = zeros([dim dim k]);
+                Mtrue = 2;
+                Mesti = 2*Mtrue;
+                
+                obj.data = obj.generateDataFromModel([I J K Mtrue]);
+                obj.data.M = Mesti;
+                
+            elseif isa(X,'dataClass')
+                obj.data = X;
+                obj.data.M = M;
             else
                 obj.data.X = X;
                 obj.data.M = M;
@@ -61,9 +68,15 @@ classdef varBayesModelParafac2 < handle
             
         end
         
-        function status = computeVarDistribution(obj)
+        function status = computeVarDistribution(obj,maxiter)
             % Implementation of CAVI to compute the variational distribution
             % of the probabilistic Parafac2 model
+            
+            if nargin < 2
+                obj.maxiter = intmax;
+            else
+                obj.maxiter = maxiter;
+            end
             
             status = 0;
             
@@ -82,9 +95,14 @@ classdef varBayesModelParafac2 < handle
             fprintf('\n') ;
             end
             % Update Variational Factors until ELBO has converged
-            obj.data.iter = 0;
+            if isempty(obj.data.iter)
+                obj.data.iter = 0;
+%             else
+%                 obj.data.iter = obj.data.iter+1;
+            end
             
             diff = ELBO-ELBO_prev;
+            tic;
             while abs(diff)/abs(ELBO) > 1e-6 && obj.maxiter > obj.data.iter
                 
                 % Update all variational factors
@@ -97,9 +115,10 @@ classdef varBayesModelParafac2 < handle
                 
                 if isempty(obj.ELBO_chain) || numel(obj.ELBO_chain)<obj.data.iter+1
                     obj.ELBO_chain = [obj.ELBO_chain zeros(1,100)];
+                    obj.evaltime = [obj.evaltime zeros(1,100)];
                 end
                 obj.ELBO_chain(obj.data.iter+1) = ELBO;
-                
+                obj.evaltime(obj.data.iter+1) = toc;
 
                 diff = ELBO-ELBO_prev;
                 if obj.verbose && obj.data.iter ~= 0
@@ -127,6 +146,7 @@ classdef varBayesModelParafac2 < handle
             fprintf('\n');
             end
             obj.ELBO_chain = nonzeros(obj.ELBO_chain)';
+            obj.evaltime = nonzeros(obj.evaltime)';
         end
         
         function displayResults(obj)
@@ -167,7 +187,7 @@ classdef varBayesModelParafac2 < handle
         
         
         % #### Plot functions
-        function plotSolution(obj,k,MLEflag)
+        function plotSolutionSynthK(obj,k,MLEflag)
             
             
 %             MLEflag = 1;
@@ -180,6 +200,81 @@ classdef varBayesModelParafac2 < handle
         end
         
         
+        function plotSolutionMatrixRealK(obj,k)
+            xRecon = obj.qDist.qA.mean*diag(obj.qDist.qC.mean(k,:))*obj.qDist.qF.mean'*obj.qDist.qP.mean(:,:,k)';
+            
+            subplot(1,3,1)
+            imagesc(obj.data.X(:,:,k))
+            colorbar
+            subplot(1,3,2)
+            imagesc(xRecon)
+            colorbar
+            subplot(1,3,3)
+            imagesc((obj.data.X(:,:,k)-xRecon)./abs(obj.data.X(:,:,k)))
+            colorbar
+            
+            avgError=sum(sum((obj.data.X(:,:,k)-xRecon)./abs(obj.data.X(:,:,k))))/numel(xRecon);
+            fprintf('Avg. Error on relative estimate: %f\n',avgError)
+        end
+        
+        function plotSolutionReal3D(obj,k,m,mask)
+            U = obj.qDist.qA.mean*diag(obj.qDist.qC.mean(k,:));
+            V = obj.qDist.qP.mean(:,:,k)*obj.qDist.qF.mean;
+
+            plotComponent(U(:,m),V(:,m)', mask, [ 53    63    46])
+        end
+        
+    end
+    
+    methods (Static)
+        
+        function generatedData = generateDataFromModel(dimensions)
+            rng('default')
+            rng(2)
+            
+            I = dimensions(1);
+            J = dimensions(2);
+            K = dimensions(3);
+            M = dimensions(4);
+            
+            
+            generatedData = dataClass;
+            
+            generatedData.X = zeros([I J K]);
+            generatedData.Mtrue= M;
+            
+            generatedData.SigmaAtrue = 1;
+            generatedData.SigmaBtrue = 1e4;
+            generatedData.AlphaAtrue = 1;
+            generatedData.AlphaBtrue = 1e-4;
+            
+%             generatedData.Sigmatrue = repmat(1e1,1,generatedData.K);%gamrnd(generatedData.SigmaAtrue,generatedData.SigmaBtrue,1,generatedData.K);
+%             generatedData.Alphatrue = repmat(1e-4,1,generatedData.Mtrue);%gamrnd(generatedData.AlphaAtrue,generatedData.AlphaBtrue,1,generatedData.Mtrue);
+            
+            generatedData.Sigmatrue = gamrnd(generatedData.SigmaAtrue,generatedData.SigmaBtrue,1,generatedData.K);
+            generatedData.Alphatrue = gamrnd(generatedData.AlphaAtrue,generatedData.AlphaBtrue,1,generatedData.Mtrue);
+            
+            
+            generatedData.Atrue = 10*mvnrnd(zeros(generatedData.I,generatedData.Mtrue),eye(generatedData.Mtrue));
+            generatedData.Ftrue = 10*mvnrnd(zeros(generatedData.Mtrue,generatedData.Mtrue),eye(generatedData.Mtrue));
+            
+            generatedData.Ctrue = 10*mvnrnd(zeros(generatedData.K,generatedData.Mtrue),sqrt(1./generatedData.Alphatrue)*eye(generatedData.Mtrue));
+            
+            generatedData.Etrue = zeros(generatedData.I,generatedData.J,generatedData.K);
+            generatedData.X = zeros(generatedData.I,generatedData.J,generatedData.K);
+            generatedData.Ptrue = zeros(generatedData.J,generatedData.Mtrue,generatedData.K);
+            
+            for k = 1:generatedData.K
+                
+                generatedData.Ptrue(:,:,k) = orth(mvnrnd(zeros(generatedData.J,generatedData.Mtrue),eye(generatedData.Mtrue)));
+                
+                generatedData.Etrue(:,:,k) = mvnrnd(zeros(generatedData.I,generatedData.J)...
+                    ,eye(generatedData.J)*sqrt(1./generatedData.Sigmatrue(k)));
+                generatedData.X(:,:,k) = generatedData.Atrue*diag(generatedData.Ctrue(k,:))*...
+                    generatedData.Ftrue'*generatedData.Ptrue(:,:,k)'+generatedData.Etrue(:,:,k);
+            end
+            
+        end
         
         
     end
