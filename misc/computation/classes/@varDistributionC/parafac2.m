@@ -150,95 +150,7 @@ F = obj.data.M;
 % E-mail rb@kvl.dk
 %
 
-
-
-if nargin==0
-   disp(' ')
-   disp(' ')
-   disp(' THE PARAFAC2 MODEL')
-   disp(' ')
-   disp(' Type <<help parafac2>> for more info')
-   disp('  ')
-   disp(' I/O ')
-   disp(' [A,H,C,P]=parafac2(X,F);')
-   disp(' ')
-   disp(' Or optionally')
-   disp(' ')
-   disp(' [A,H,C,P,fit]=parafac2(X,F,Constraints,Options);')
-   disp(' ')
-   disp(' Options=[Crit MaxIt Init Xval Show]')
-   disp(' ')
-   disp(' ')
-   return
-
- elseif nargin<1&~all(X=='demo')
-
-    error(' The inputs X and F must be given')
-
- end
-
- 
-  if isstr(X) & all(X=='demo')
-    F=3;
-    n=1:30;
-    disp(' ')
-    disp(' %%%%% PARAFAC2 DEMO %%%%%%')
-    disp(' ')
-    disp(' Generating simulated data')
-    disp(' Note that the second mode loadings change from slab to slab')
-    disp(' hence the ordinary PARAFAC model is not valid')
-    disp(' ')
-    subplot(2,2,1)
-    A=[exp(-((n-15)/5).^2);exp(-((n-1)/10).^2);exp(-((n-21)/7).^2)]';
-    plot(A),title(' First mode loadings')
-    subplot(2,2,2)
-    C=rand(4,3);
-    plot(C),title(' Third mode loadings')
-    H=orth(orth(rand(F))');
-    P=[];X=[];
-    for i=1:size(C,1),
-       subplot(2,4,4+i)
-       P(:,:,i)=orth(rand(7,F));
-       plot(P(:,:,i)*H),eval(['title([''2. mode, k = '',num2str(i)])'])
-    end,
-    disp(' Press key to continue'),pause
-    for i=1:size(C,1),
-       X(:,:,i)=A*diag(C(i,:))*(P(:,:,i)*H)';
-    end,
-    
-    X = X + randn(size(X))*.01;
-    disp(' Adding one percent noise and fitting model')
-    disp(' Several initial models will be fitted and the best used')
-    [a,h,c,p]=parafac2(X,F);
-    
-    disp(' ')
-    disp(' Results shown in plot')
-    subplot(2,2,1)
-    plot(A*diag(sum(A).^(-1)),'r'),
-    hold on,
-    plot(a*diag(sum(a).^(-1)),'g'),title(' First mode (red true,green estimated)')
-    hold off
-    subplot(2,2,2)
-    plot(C*diag(sum(C).^(-1)),'r')
-    hold on,
-    plot(c*diag(sum(c).^(-1)),'g'),title(' Third mode (red true,green estimated)')
-    hold off
-    for i=1:size(C,1),
-       subplot(2,4,4+i)
-       ph=P(:,:,i)*H;
-       plot(ph*diag(sum(ph).^(-1)),'r'),
-       hold on
-       ph=p{i}*h;
-       plot(ph*diag(sum(ph).^(-1)),'g'),
-       eval(['title([''2. mode, k = '',num2str(i)])'])
-       hold off
-    end,
-    return
-   
-end
-
-
-ShowFit  = 1000; % Show fit every 'ShowFit' iteration
+ShowFit = 1000;
 NumRep   = 10; %Number of repetead initial analyses
 NumItInRep = 80; % Number of iterations in each initial fit
 if ~(length(size(X))==3|iscell(X))
@@ -248,24 +160,12 @@ end
 randn('state',sum(100*clock));
 rand('state',sum(100*clock));
 
-if nargin < 3
-  Options = zeros(1,5);
-end
-if length(Options)<5
-   Options = Options(:);
-   Options = [Options;zeros(5-length(Options),1)];
-end
 
 % Convergence criterion
 if Options(1)==0
    ConvCrit = 1e-7;
 else
    ConvCrit = Options(1);
-end
-if Options(5)==0
-   disp(' ')
-   disp(' ')
-   disp([' Convergence criterion        : ',num2str(ConvCrit)])
 end
 
 % Maximal number of iterations 
@@ -277,16 +177,11 @@ else
    MaxIt = Options(2);
 end
 
+
 % Initialization method
 initi = Options(3);
 
-if nargin<2
-  Constraints = [0 0];
-end
-if length(Constraints)~=2
-   Constraints = [0 0];
-   disp(' Length of Constraints must be two. It has been set to zeros')
-end
+
 % Modify to handle GPA (Constraints = [10 10]);
 if Constraints(2)==10
    Constraints(1)=0;
@@ -311,109 +206,24 @@ ConstraintOptions=[ ...
    'GPA                       '];
    
 
-if Options(5)==0
-   disp([' Maximal number of iterations : ',num2str(MaxIt)])
-   disp([' Number of factors            : ',num2str(F)])
-   disp([' Loading 1. mode, A           : ',ConstraintOptions(Constraints(1)+2,:)])
-   disp([' Loading 3. mode, C           : ',ConstraintOptions(Constraints(2)+2,:)])
-   disp(' ')
-end
 
+% % Make X a cell array if it isn't
+% if ~iscell(X)
+%   for k = 1:size(X,3)
+%     x{k} = X(:,:,k);
+%   end
+%   X = x;
+%   clear x
+% end
+I = size(X,1);
+K = size(X,3);
 
-% Make X a cell array if it isn't
-if ~iscell(X)
-  for k = 1:size(X,3)
-    x{k} = X(:,:,k);
-  end
-  X = x;
-  clear x
-end
-I = size(X{1},1);
-K = max(size(X));
-
-% CROSS-VALIDATION
-if Options(4)==1
-   Opt = Options;
-   Opt(4) = 0;
-   splits = 7;
-   while rem(I,splits)==0 % Change the number of segments if 7 is a divisor in prod(size(X))
-      splits = splits + 2;
-   end
-   AddiOutput.NumberOfSegments = splits;
-   if Options(5)==0
-      disp(' ')
-      disp([' Cross-validation will be performed using ',num2str(splits),' segments'])
-      disp([' and using from 1 to ',num2str(F),' components'])
-      XvalModel = [];
-   end
-   SS = zeros(1,F);
-   for f = 1:F
-      Arep = [];Hrep = [];Crep = [];clear Prep;
-      for s = 1:splits
-         Xmiss = X;
-         for k = 1:K 
-            Xmiss{k}(s:splits:end)=NaN;
-         end
-         [a,h,c,p]=parafac2(Xmiss,f,Constraints,Opt);
-         Arep(:,:,s)=a;Hrep(:,:,s)=h;Crep(:,:,s)=c;Prep(s,:)=p;
-         for k = 1:K
-            m    = a*diag(c(k,:))*(p{k}*h)';
-            M{k} = m;
-            SS(f) = SS(f) + sum(sum(((X{k}(s:splits:end)-m(s:splits:end)).^2))); 
-         end
-         XvalModel{f} = M;
-      end
-      %AddiOutput.XvalModels=XvalModel;
-      AddiOutput.SS = SS;
-      AddiOutput.A_xval{f}=Arep;
-      AddiOutput.H_xval{f}=Hrep;
-      AddiOutput.C_xval{f}=Crep;
-      AddiOutput.P_xval{f}=Prep;
-      A = AddiOutput;
-   end
-
-      clf
-      plot([1:F],SS),title(' Residual sum-squares - cross-validation')
-      xlabel('Number of components')
-      disp(' ')
-      disp(' The total model has NOT been fitted.')
-      disp(' You must refit the model with the number of ')
-      disp(' components you judge necessary.')
-      disp(' ')
-      disp(' You can also check the outputted struct array')
-      disp(' It contains loadings estimated from different')
-      disp(' subsets and stability of subsets indicates validity.')
-      disp(' (e.g. if name of struct array is Output then the file')
-      disp(' AX=Output.A_xval{3}is a three-way array holding all A')
-      disp(' loadings estimated with 3 components. AX(:,:,1) is the ')
-      disp(' estimate of A obtained from the first subset etc.')
-      
-      [a,b]=min(SS);
-      figure
-      subplot(2,1,1)
-      a=AddiOutput.A_xval{b};
-      for i=2:splits
-         plot(a(:,:,i),'r'),hold on
-      end
-      title([' A resampled during Xval for ',num2str(b),' comp.'])
-      hold off
-      
-      subplot(2,1,2)
-      c = AddiOutput.C_xval{b};
-      for i=2:splits
-         plot(c(:,:,i),'r'),hold on
-      end
-      title([' C resampled during Xval for ',num2str(b),' comp.'])
-      hold off
-      A = AddiOutput;
-      return
-  end
 
 % Find missing and replace with average 
 MissingElements = 0;
 MissNum=0;AllNum=0;
 for k = 1:K
-   x=X{k};
+   x=X(:,:,k);
    miss = sparse(isnan(x));
    MissingOnes{k} = miss;
    if any(miss(:))
@@ -434,6 +244,8 @@ if MissingElements
    end
 end
 clear x
+
+
 
 % Initialize by ten small runs
 if nargin<4
@@ -470,10 +282,13 @@ if nargin<4
       if Options(5)==0
          disp(' SVD based initialization')
       end
-      XtX=X{1}*X{1}';
-      for k = 2:K
-         XtX = XtX + X{k}*X{k}';
-      end
+%       XtX=X{1}*X{1}';
+%       for k = 2:K
+%          XtX = XtX + X{k}*X{k}';
+%       end
+      
+      XtX = sum(mtimesx(X,X,'T'),3);
+      
       [A,s,v]=svd(XtX,0);  
       A=A(:,1:F);
       C=ones(K,F)+randn(K,F)/10;
@@ -491,10 +306,11 @@ if nargin<4
 end
 
 if initi~=1
-   XtX=X{1}*X{1}'; % Calculate for evaluating fit (but if initi = 1 it has been calculated)
-   for k = 2:K
-      XtX = XtX + X{k}*X{k}';
-   end
+%    XtX=X{1}*X{1}'; % Calculate for evaluating fit (but if initi = 1 it has been calculated)
+%    for k = 2:K
+%       XtX = XtX + X{k}*X{k}';
+%    end
+   XtX = sum(mtimesx(X,X,'T'),3);
 end  
 fit    = sum(diag(XtX));
 oldfit = fit*2;
@@ -515,10 +331,10 @@ while abs(fit-oldfit)>oldfit*ConvCrit & it<MaxIt & fit>1000*eps
     
     % Update P
     for k = 1:K
-      Qk       = X{k}'*(A*diag(C(k,:))*H');
+      Qk       = X(:,:,k)'*(A*diag(C(k,:))*H');
       P{k}     = Qk*psqrt(Qk'*Qk);
     %  [u,s,v]  = svd(Qk.');P{k}  = v(:,1:F)*u(:,1:F)';
-      Y(:,:,k) = X{k}*P{k};
+      Y(:,:,k) = X(:,:,k)*P{k};
     end
     
     % Update A,H,C using PARAFAC-ALS
@@ -559,12 +375,12 @@ function [fit,X]=pf2fit(X,A,H,C,P,K,MissingElements,MissingOnes);
      % if missing values replace missing elements with model estimates
      if nargout == 2 
        if any(MissingOnes{k})
-         x=X{k};
+         x=X(:,:,k);
          x(find(MissingOnes{k})) = M(find(MissingOnes{k}));
-         X{k} = x;
+         X(:,:,k) = x;
        end
      end
-     fit = fit + sum(sum(abs (X{k} - M ).^2));
+     fit = fit + sum(sum(abs (X(:,:,k) - M ).^2));
    end
 
 
