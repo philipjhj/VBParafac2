@@ -3,7 +3,7 @@ load('/media/data/DataAndResults/Thesis/motor_normalized_all_subs.mat')
 
 warning on MATLAB:nearlySingularMatrix
 
-% myModel=varBayesModelParafac2;
+myModel=varBayesModelParafac2;
 
 % I=15;
 % J=10;
@@ -15,21 +15,23 @@ warning on MATLAB:nearlySingularMatrix
 % myModel=varBayesModelParafac2(data,Mesti);
 
 
-myModel=varBayesModelParafac2(Y,5);
+% myModel=varBayesModelParafac2(Y,5);
 
 
 myModel.qDist.debugflag = 0;
 myModel.verbose = 1;
-% myModel.qDist.method = 'vonmises';
-myModel.qDist.method = 'parafac2svd';
+myModel.qDist.method = 'vonmises';
+% myModel.qDist.method = 'parafac2svd';
 
-myModel.qDist.SNR
+%myModel.qDist.SNR
 
 myModel.qDist.activeParams_opt = {'qA','qC','qP','qF','qSigma','qAlpha'};
+
+%%
 tic
-myModel.computeVarDistribution(5);
+myModel.computeVarDistribution;
 toc
-myModel.qDist.SNR
+%myModel.qDist.SNR
 
 
 %%
@@ -38,14 +40,23 @@ myModel.plotSolutionSynthK(2,0)
 
 
 %%
-for k = 1:3
+for k = 1:1
     
     clf
-    myModel.plotSolutionRealK(k)
-   pause
+    myModel.plotSolutionRealMatrixK(k)
+%    pause
    
 end
 
+%%
+m=matfile('/media/data/DataAndResults/Thesis/motor_normalized_all_subs.mat');
+mask = m.mask;
+
+k = 1;
+m = 1:5;
+
+clf
+myModel.plotSolutionReal3D(k,m,mask)
 
 
 %%

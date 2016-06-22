@@ -34,7 +34,7 @@ classdef varBayesModelParafac2 < handle
                 K = 5;
                 
                 Mtrue = 2;
-                Mesti = 2*Mtrue;
+                Mesti = Mtrue;
                 
                 obj.data = obj.generateDataFromModel([I J K Mtrue]);
                 obj.data.M = Mesti;
@@ -194,7 +194,7 @@ classdef varBayesModelParafac2 < handle
         end
         
         
-        function plotSolutionMatrixRealK(obj,k)
+        function plotSolutionRealMatrixK(obj,k)
             xRecon = obj.qDist.qA.mean*diag(obj.qDist.qC.mean(k,:))*obj.qDist.qF.mean'*obj.qDist.qP.mean(:,:,k)';
             
             subplot(1,3,1)

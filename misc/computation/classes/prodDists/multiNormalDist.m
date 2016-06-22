@@ -11,7 +11,7 @@ classdef multiNormalDist < probabilityDist
         meanOuterProduct
         meanOuterProductSingle
         meanInnerProductMatrix % E[X^T.X] (Constant value, if correct)
-        meanInnerProductTransposed % E[X.X^T] (Constant value, if correct)
+%         meanInnerProductTransposed % E[X.X^T] (Constant value, if correct)
         meanInnerProductSumComponent
         distSquared
     end
@@ -89,23 +89,23 @@ classdef multiNormalDist < probabilityDist
             end
         end
         
-        function value = get.meanInnerProductTransposed(obj)
-            
-            % Covariance is square and symmetric
-            
-            if ismatrix(obj.mean)
-                obj.mean = obj.mean';
-            else
-%                 obj.mean = permute(obj.mean,[2 1 3]);
-                K=obj.arrayDim(3);
-                value = zeros([size(obj.mean,2) size(obj.mean,2) size(obj.mean,3)]);
-                for k = 1:K
-                    value(:,:,k) = obj.mean(:,:,k)'*obj.mean(:,:,k);
-                    value(:,:,k) = value(:,:,k) +...
-                    diag(diag(sum(obj.variance(:,:,:,k),3)));
-                end
-            end
-        end
+%         function value = get.meanInnerProductTransposed(obj)
+%             
+%             % Covariance is square and symmetric
+%             
+%             if ismatrix(obj.mean)
+%                 meanT = obj.mean';
+%             else
+% %                 obj.mean = permute(obj.mean,[2 1 3]);
+%                 K=obj.arrayDim(3);
+%                 value = zeros([size(obj.mean,2) size(obj.mean,2) size(obj.mean,3)]);
+%                 for k = 1:K
+%                     value(:,:,k) = obj.mean(:,:,k)'*obj.mean(:,:,k);
+%                     value(:,:,k) = value(:,:,k) +...
+%                     diag(diag(sum(obj.variance(:,:,:,k),3)));
+%                 end
+%             end
+%         end
         
         function updateStatistics(obj)
            obj.computeEntropy;
