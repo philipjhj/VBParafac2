@@ -25,7 +25,8 @@ myModel.qDist.debugflag = 0;
 myModel.verbose = 1;
 myModel.qDist.method = 'vonmises';
 % myModel.qDist.method = 'parafac2svd';
-
+%%
+myModel.maxTime = realmax;
 
 %myModel.qDist.SNR
 

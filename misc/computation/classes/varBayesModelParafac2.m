@@ -11,6 +11,7 @@ classdef varBayesModelParafac2 < handle
         % Settings
         verbose = 1; % 1, display, 0 hide everything
         maxiter
+        maxTime
         %showIter = 1500;
     end
     properties
@@ -47,8 +48,8 @@ classdef varBayesModelParafac2 < handle
             % Summary of constructor
             
 %             mtimesx('SPEED');
-            
-
+                
+            obj.maxTime = realmax;
             obj.data = dataClass;
             if nargin < 1
                 % Some dims to test
@@ -76,6 +77,7 @@ classdef varBayesModelParafac2 < handle
             % Create variational distribution object
             obj.qDist = varDistributionC(obj);
             obj.n_components(1) = sum(sum(obj.qDist.qC.mean)~=0);
+            obj.evaltime(1) = 0;
             
         end
         
@@ -122,7 +124,7 @@ classdef varBayesModelParafac2 < handle
             diff_prev = 0;
             diff = ELBO-ELBO_prev;
             tic;
-            while (abs(diff)/abs(ELBO) > 1e-7 || diff > diff_prev) && obj.maxiter > obj.data.iter
+            while abs(diff)/abs(ELBO) > 1e-7 && obj.maxiter > obj.data.iter && obj.maxTime > obj.evaltime(max(obj.data.iter,1))
                 
                 % Update all variational factors
                 obj.qDist.updateMoments;
@@ -179,6 +181,7 @@ classdef varBayesModelParafac2 < handle
             end
             obj.ELBO_chain = nonzeros(obj.ELBO_chain)';
             obj.evaltime = nonzeros(obj.evaltime)';
+            obj.n_components = nonzeros(obj.n_components)';
         end
         
         function displayResults(obj)
