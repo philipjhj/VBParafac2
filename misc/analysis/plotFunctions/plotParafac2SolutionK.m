@@ -4,6 +4,8 @@ function plotParafac2SolutionK(k,X,A,C,F,P,Atrue,Ctrue,Ftrue,Ptrue,MLEflag,Etrue
 M = size(A,2);
 Mtrue = size(Atrue,2);
 
+% K = size(X,3);
+
 xRecon = A*diag(C(k,:))*F'*P(:,:,k)';
 
 estiCell = {xRecon,A,C,F,P};
@@ -83,14 +85,15 @@ end
 
 % ### X plot
 axes(ha(1))
-displayImageValues(trueCell{1}(:,:,k),strcat(titleTrueCell{1},num2str(k)),colorInterval)
-
+displayImageValues(trueCell{1}(:,:,k),strcat(titleTrueCell{1},num2str(k)),colorInterval)%
+colorbar
 axes(ha(6))
 displayImageValues(estiCell{1},strcat(titleEstiCell{1},num2str(k)),colorInterval)
-
+colorbar
 if MLEflag
     axes(ha(11))
     displayImageValues(mleCell{1},titleMLECell{1},colorInterval)
+    colorbar
 end
 
 
@@ -120,13 +123,23 @@ for i = 2:numel(trueCell)
     axes(ha(i))
     displayImageValues(myImageTrue,titleTrueCell{i},colorInterval)
     
+    if i == 3
+        addValuesToImage(myImageTrue)
+    end
+    
     axes(ha(i+5))
     displayImageValues(myImageEsti,titleEstiCell{i},colorInterval)
     
+    if i == 3
+        addValuesToImage(myImageEsti)
+    end
     
     if MLEflag
         axes(ha(i+10))
         displayImageValues(myImageMLE,titleMLECell{i},colorInterval)
+        if i == 3
+            addValuesToImage(myImageMLE)
+        end
     end
 end
 

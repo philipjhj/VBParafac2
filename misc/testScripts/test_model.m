@@ -1,21 +1,24 @@
 load('/media/data/DataAndResults/Thesis/motor_normalized_all_subs.mat')
 %%
 
-warning on MATLAB:nearlySingularMatrix
+% warning on MATLAB:nearlySingularMatrix
 
-myModel=varBayesModelParafac2;
+% myModel=varBayesModelParafac2;
 
-% I=15;
-% J=10;
-% K=12;
-% M=2;
-% dimensions = [I J K M];
-% data = varBayesModelParafac2.generateDataFromModel([I J K M]);
-% Mesti = 2;
-% myModel=varBayesModelParafac2(data,Mesti);
+I=50;
+J=I;
+K=5;
+M=2;
+Mesti = 20;
+
+dimensions = [I J K M];
+data = varBayesModelParafac2.generateDataFromModel([I J K M]);
 
 
-% myModel=varBayesModelParafac2(Y,5);
+myModel=varBayesModelParafac2(data,Mesti);
+
+
+% myModel=varBayesModelParafac2(Y,100);
 
 
 myModel.qDist.debugflag = 0;
@@ -23,21 +26,24 @@ myModel.verbose = 1;
 myModel.qDist.method = 'vonmises';
 % myModel.qDist.method = 'parafac2svd';
 
+
 %myModel.qDist.SNR
 
-myModel.qDist.activeParams_opt = {'qA','qC','qP','qF','qSigma','qAlpha'};
+myModel.qDist.activeParams_opt = {'qA','qC','qF','qP','qAlpha','qSigma'};
+% myModel.qDist.activeParams_opt = {'qC','qAlpha'};
 
-%%
+% clc
 tic
-myModel.computeVarDistribution;
+myModel.computeVarDistribution(6500);
 toc
 %myModel.qDist.SNR
-
-
 %%
-clf
-myModel.plotSolutionSynthK(2,0)
 
+for k=1:1%myModel.data.K
+clf
+myModel.plotSolutionSynthK(k,0)
+% pause
+end
 
 %%
 for k = 1:1

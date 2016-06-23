@@ -20,9 +20,9 @@ if ~isempty(colorInterval)
 caxis(colorInterval); 
 end
 
-% colorbar
+%colorbar
 title(titleText)
-addValuesToImage(image)
+% addValuesToImage(image)
 set(gca,'XTickLabel',[])
 set(gca,'YTickLabel',[])
 end

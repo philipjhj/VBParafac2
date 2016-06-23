@@ -5,6 +5,7 @@ classdef GammaDist < probabilityDist
     properties
         alpha
         beta
+        MeanLog
     end
     
     
@@ -28,6 +29,7 @@ classdef GammaDist < probabilityDist
            obj.computeMean;
            obj.computeVariance;
            obj.computeEntropy;
+           obj.computeMeanLog;
         end
     end
     methods (Access = protected)
@@ -43,5 +45,11 @@ classdef GammaDist < probabilityDist
               obj.entropy = sum(obj.alpha+log(obj.beta)+gammaln(obj.alpha)...
                   +(1-obj.alpha).*psi(obj.alpha));
         end
+        
+        function computeMeanLog(obj)
+              obj.MeanLog = psi(obj.alpha)+log(obj.beta);
+        end
+        
+        
     end
 end
