@@ -6,45 +6,52 @@ load('/media/data/DataAndResults/Thesis/motor_normalized_all_subs.mat')
 % myModel=varBayesModelParafac2;
 
 I=50;
-J=I;
-K=5;
+J=50;
+K=10;
 M=2;
-Mesti = 20;
+Mesti = 8;
 
 dimensions = [I J K M];
-data = varBayesModelParafac2.generateDataFromModel([I J K M]);
+rng(3)
+data = varBayesModelParafac2.generateDataFromModel([I J K M],[1e12 1e-6]);
 
 
 myModel=varBayesModelParafac2(data,Mesti);
-
 
 % myModel=varBayesModelParafac2(Y,100);
 
 
 myModel.qDist.debugflag = 0;
 myModel.verbose = 1;
-myModel.qDist.method = 'vonmises';
-% myModel.qDist.method = 'parafac2svd';
-%%
-myModel.maxTime = realmax;
+% myModel.qDist.method = 'vonmises';
+myModel.qDist.method = 'parafac2svd';
+
+% myModel.maxTime = realmax;
 
 %myModel.qDist.SNR
-
-myModel.qDist.activeParams_opt = {'qA','qC','qF','qP','qAlpha','qSigma'};
+clc
+myModel.qDist.activeParams_opt = {'qP','qA','qC','qF','qAlpha','qSigma'};
 % myModel.qDist.activeParams_opt = {'qC','qAlpha'};
 
+
 % clc
+% myModel.data.iter = myModel.data.iter-1;
 tic
-myModel.computeVarDistribution(6500);
-toc
+myModel.computeVarDistribution;
+toctio
 %myModel.qDist.SNR
 %%
-
-for k=1:1%myModel.data.K
+figure
+for k=1:myModel.data.K
 clf
+
 myModel.plotSolutionSynthK(k,0)
-% pause
+pause
 end
+%%
+clf
+myModel.plotELBO([100 myModel.data.iter-1])
+
 
 %%
 for k = 1:1
@@ -58,11 +65,13 @@ end
 %%
 m=matfile('/media/data/DataAndResults/Thesis/motor_normalized_all_subs.mat');
 mask = m.mask;
-
+set(0,'DefaultFigureWindowStyle','docked')
+%%
+close all
 k = 1;
-m = 1:5;
+m = 1:25;
 
-clf
+% close all
 myModel.plotSolutionReal3D(k,m,mask)
 
 

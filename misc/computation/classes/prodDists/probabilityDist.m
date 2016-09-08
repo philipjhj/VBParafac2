@@ -10,7 +10,7 @@ classdef probabilityDist < handle
         variance
         entropy
     end
-    properties (Access=protected)
+    properties
         arrayDim % Dimensions of the distribution
         I
         J

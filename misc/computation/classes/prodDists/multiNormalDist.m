@@ -136,8 +136,8 @@ classdef multiNormalDist < probabilityDist
                 matrixIPSsize = [I I];
             end
                 
-            checkDimA = ndims(A);
-            if checkDimA == 3 % Init for per slab in A
+            checkDimA = ndims(A) == 3;
+            if checkDimA % Init for per slab in A
                 K_A = size(A,3);
                 matrixIPS = zeros([matrixIPSsize K_A]);
                 %[matrixIPS{:}] = deal(zeros(I,J));%,K_dist));

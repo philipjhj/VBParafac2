@@ -24,24 +24,24 @@ classdef varDistributionC < handle
         method='parafac2svd' % Method used to approximate E(qP)
         debugflag = 1
         activeParams_opt = {'qA','qC','qF','qP','qSigma','qAlpha'}
+        
     end
     
     properties (Dependent)
-        % Terms in ELBO
-        
+        % ELBO Terms
         ELBO
         ePxz
         eQz
     end
     
     properties %(Access = private)
-        % For updating moments, per k'th slab
-        eD
         
         % Computed values
         XInnerProduct
         qPvonmisesEntropy
         
+        % Shared terms between moments
+        eD
         eCsquared
         ePtP
         eFtPtPF
@@ -67,7 +67,7 @@ classdef varDistributionC < handle
         qSigmaEntropy
         qAlphaEntropy
     end
-    properties (Access = protected)
+    properties %(Access = protected)
         activeParams = {'qP','qF','qC','qA','qSigma','qAlpha'}
     end
     
@@ -79,8 +79,8 @@ classdef varDistributionC < handle
             
             % Initialize Data
             obj.data = modelobj.data;
-            %             obj.iter = modelobj.iter;
-%             rng(2)
+            
+            % Initialize distribution classes
             obj.qA = multiNormalDist('qA',[obj.data.I obj.data.M],true);
             obj.qC = multiNormalDist('qC',[obj.data.K obj.data.M]);
             obj.qF = multiNormalDist('qF',[obj.data.M obj.data.M]);
@@ -91,22 +91,17 @@ classdef varDistributionC < handle
             obj.pSigma = GammaDist('pSigma',[1 1]);
             obj.pAlpha = GammaDist('pAlpha',[1 1]);
             
-%             obj.qC.mean = zeros(obj.data.K,obj.data.M);
-           
-            
             obj.XInnerProduct = obj.computeXInnerProduct;
             
-            
             % Use same initialization as the original parafac2 code
-%             [A,F,C,P]=obj.parafac2([0 0],[0, -1, 0,0,1]);
-%             
-%             obj.qA.mean = A;
-%             obj.qC.mean = C;
-%             obj.qF.mean = F;
-%             obj.qP.mean = cat(3,P{:});
-            
+            %             [A,F,C,P]=obj.parafac2([0 0],[0, -1, 0,0,1]);
             %
-            % Initialize Sufficient Stats
+            %             obj.qA.mean = A;
+            %             obj.qC.mean = C;
+            %             obj.qF.mean = F;
+            %             obj.qP.mean = cat(3,P{:});
+            
+            % Initialize Shared Terms
             obj.compute_eD;
             obj.compute_eCtC;
             obj.compute_eCsquared;
@@ -115,17 +110,10 @@ classdef varDistributionC < handle
             obj.compute_eDFtPtPFD;
             obj.compute_eAiDFtPtPFDAi;
             
-%             obj.pAlpha.alpha(2:end) = 1e3;%*obj.pAlpha.alpha;
-%             obj.pAlpha.beta(1:end) = 1e3;
-%             obj.updateqAlpha;
-%             obj.qAlpha.updateStatistics;
-%             
-            
-            
             % Initialize ELBO terms
             all_params = {'qA','qC','qF','qP','qSigma','qAlpha'};
             
-            obj.computeqXMeanLog
+            
             for i  = 1:numel(all_params)
                 obj.(all_params{i}).updateStatistics;
                 
@@ -137,12 +125,15 @@ classdef varDistributionC < handle
                 
             end
             
-%                         obj.qA.mean = [obj.data.Atrue zeros(obj.data.I,obj.data.M-obj.data.Mtrue)];
-%                         obj.qC.mean = [obj.data.Ctrue zeros(obj.data.K,obj.data.M-obj.data.Mtrue)];
-%                         obj.qF.mean = [obj.data.Ftrue;
-%                         obj.qP.mean = obj.data.Ptrue;
-%                         obj.qAlpha.mean = [obj.data.Alphatrue 1e9*ones(1,obj.data.M-obj.data.Mtrue)];
-%                         obj.qSigma.mean = obj.data.Sigmatrue;
+            obj.computeqXMeanLog
+            
+            % Uncomment to set values to the ground truth
+            %                         obj.qA.mean = [obj.data.Atrue zeros(obj.data.I,obj.data.M-obj.data.Mtrue)];
+            %                         obj.qC.mean = [obj.data.Ctrue zeros(obj.data.K,obj.data.M-obj.data.Mtrue)];
+%                                     obj.qF.mean = obj.data.Ftrue;
+            %                         obj.qP.mean = obj.data.Ptrue;
+%                                     obj.qAlpha.mean = [obj.data.Alphatrue 1e9*ones(1,obj.data.M-obj.data.Mtrue)];
+%                                     obj.qSigma.mean = obj.data.Sigmatrue;
             
             
         end
@@ -159,7 +150,7 @@ classdef varDistributionC < handle
             disp(norm(obj.data.X(:))^2/norm(obj.data.Etrue(:))^2)
         end
         
-        
+        % Function by Rasmus Bro to get initial values
         [A,H,C,P,fit,AddiOutput] = parafac2(obj,Constraints,Options,A,H,C,P);
         
         
@@ -175,15 +166,8 @@ classdef varDistributionC < handle
         function value = get.ePxz(obj)
             % Recompute for active parameters
             for i  = 1:numel(obj.activeParams)
-                prev_mean = obj.(strcat(obj.activeParams{i},'MeanLog'));
                 methodStr = strcat('compute',obj.activeParams{i},'MeanLog');
                 obj.(methodStr);
-                
-                % Test how ELBO term has changed
-%                 if  0>(obj.(strcat(obj.activeParams{i},'MeanLog'))-prev_mean);
-%                     fprintf('Mean change for %s is %f\n',obj.activeParams{i},...
-%                     obj.(strcat(obj.activeParams{i},'MeanLog'))-prev_mean)
-%                 end
                 
             end
             
@@ -208,16 +192,8 @@ classdef varDistributionC < handle
             
             for i = 1:numel(obj.activeParams)
                 methodStr = strcat(obj.activeParams{i},'Entropy');
-                prev_entropy = obj.(methodStr);
                 
                 obj.(methodStr) = obj.(obj.activeParams{i}).entropy;
-                
-                % Test how ELBO term has changed
-%                 if  0>(obj.(methodStr)-prev_entropy);
-%                     fprintf('Entropy change for %s is %f\n',obj.activeParams{i},...
-%                         obj.(methodStr)-prev_entropy)
-%                 end
-                
             end
             
             % Compute sum of entropies
@@ -240,7 +216,7 @@ classdef varDistributionC < handle
             
             t3sum = sum(sum(sum(multiplyTensor(t3,obj.qSigma.mean),3).*obj.qA.mean));
             
-            obj.qXMeanLog = -obj.data.J/2*sum(obj.qSigma.entropy)-1/2*sum(obj.qSigma.mean.*(...
+            obj.qXMeanLog = obj.data.J*obj.data.I/2*sum(obj.qSigma.MeanLog)-1/2*sum(obj.qSigma.mean.*(...
                 sum(obj.eAiDFtPtPFDAi)+obj.XInnerProduct))+t3sum;
         end
         
@@ -268,7 +244,7 @@ classdef varDistributionC < handle
         end
         
         function computeqAlphaMeanLog(obj)
-            obj.qAlphaMeanLog = sum((obj.pAlpha.alpha-1)*obj.qAlpha.MeanLog-obj.qAlpha.mean./obj.pAlpha.beta);
+            obj.qAlphaMeanLog = sum((obj.pAlpha.alpha-1)*obj.qAlpha.MeanLog-obj.qAlpha.mean.*1/obj.pAlpha.beta);
         end
         
         % #################################################################
@@ -278,8 +254,28 @@ classdef varDistributionC < handle
         function updateMoments(obj)
             any_error = 0;
             first_error = 0;
+            
             for i = 1:numel(obj.activeParams)
-                ELBO_prev = obj.ELBO;
+                %                 ELBO_prev = obj.ELBO;
+                
+                if any(~ismember(obj.activeParams,'qAlpha'))
+                    XMeanLog_prev = obj.qXMeanLog; % Depends on everything but qAlpha
+                else
+                    XMeanLog_prev= 0;
+                end
+                
+                if strcmp(obj.activeParams{i},'qAlpha')
+                    CMeanLog_prev = obj.qCMeanLog; % Depends on everything but qAlpha
+                else
+                    CMeanLog_prev= 0;
+                end
+                
+                methodStr = strcat(obj.activeParams{i},'MeanLog');
+                
+                ELBO_prev = XMeanLog_prev+CMeanLog_prev+...
+                    obj.(methodStr)+obj.(obj.activeParams{i}).entropy;
+                
+                ELBO_prev2 = obj.ELBO;
                 
                 if ~ismember(obj.activeParams{i},{'qAlpha','qSigma'}) || obj.data.iter>=25% || obj.data.iter==0
                     
@@ -287,40 +283,117 @@ classdef varDistributionC < handle
                     obj.(methodStr);
                     obj.(obj.activeParams{i}).updateStatistics;
                 end
+                
+                
+                
+                % Update shared terms
                 if strcmp(obj.activeParams{i},'qP')
                     obj.compute_ePtP;
+                    
+                    % Update dependent terms if some not active
+                    if ~ismember('qF',obj.activeParams)
+                        obj.compute_eFtPtPF;
+                    elseif all(~ismember({'qC','qF'},obj.activeParams))
+                        obj.compute_eDFtPtPFD;
+                    elseif all(~ismember({'qC','qF','qA'},obj.activeParams))
+                        obj.compute_eAiDFtPtPFDAi;
+                    end
+                    
                 elseif strcmp(obj.activeParams{i},'qF')
                     obj.compute_eFtPtPF;
+                    
+                    % Update dependent terms if some not active
+                    if ~ismember('qC',obj.activeParams)
+                        obj.compute_eDFtPtPFD;
+                    elseif all(~ismember({'qC','qA'},obj.activeParams))
+                        obj.compute_eAiDFtPtPFDAi;
+                    end
+                    
                 elseif strcmp(obj.activeParams{i},'qC')
                     obj.compute_eD;
                     obj.compute_eCtC;
                     obj.compute_eCsquared;
                     obj.compute_eDFtPtPFD;
+                    
+                    % Update dependent terms if some not active
+                    if ~ismember('qA',obj.activeParams)
+                        obj.compute_eAiDFtPtPFDAi;
+                    end
+                    
                 elseif strcmp(obj.activeParams{i},'qA')
                     obj.compute_eAiDFtPtPFDAi;
                 end
                 
-                if obj.debugflag && obj.ELBO-ELBO_prev < -1e-5 && obj.data.iter > 0
-                        any_error = 1;
-                        if ~first_error
-                           first_error = 1;
-                           fprintf('\n');
-                        end
-                        warning('off','backtrace')
-                        warning(sprintf('Update problem; ELBO change for %s update is %f\n',obj.activeParams{i},...
-                        obj.ELBO-ELBO_prev));
-                        warning('on','backtrace')
+                
+                if any(~ismember(obj.activeParams,'qAlpha'))
+                    obj.computeqXMeanLog;
+                    XMeanLog_new = obj.qXMeanLog; % Depends on everything but qAlpha
+                else
+                    XMeanLog_new=0;
                 end
                 
+                if strcmp(obj.activeParams{i},'qAlpha')
+                    obj.computeqCMeanLog;
+                    CMeanLog_new = obj.qCMeanLog; % Depends on everything but qAlpha
+                else
+                    CMeanLog_new= 0;
+                end
+                
+                
+                methodStr = strcat('compute',obj.activeParams{i},'MeanLog');
+                obj.(methodStr);
+                
+                methodStr = strcat(obj.activeParams{i},'MeanLog');
+                
+                ELBO_new = XMeanLog_new+CMeanLog_new+...
+                    obj.(methodStr)+obj.(obj.activeParams{i}).entropy;
+                
+                ELBO_new2 = obj.ELBO;
+                
+                if obj.debugflag && (ELBO_new-ELBO_prev)/abs(ELBO_new) < -1e-8 && obj.data.iter > 0
+                    any_error = 1;
+                    if ~first_error
+                        first_error = 1;
+                        fprintf('\n');
+                    end
+                    warning('off','backtrace')
+                    warning(sprintf('varDist:Update:%s',obj.activeParams{i}),...
+                        'Update problem; ELBO absolute/relative change for %s update is %f / %f \t %f\n',obj.activeParams{i},...
+                        ELBO_new-ELBO_prev,(ELBO_new-ELBO_prev)/abs(ELBO_new),(ELBO_new2-ELBO_prev2)/abs(ELBO_new2));
+                    warning('on','backtrace')
+                    
+                end
+                
+                obj.data.ELBOall = [obj.data.ELBOall obj.ELBO];
             end
             if any_error
                 fprintf('\n')
-            end 
+            end
         end
         
         % ## Normal distributions
         % ### Variational Factor A
         function updateqA(obj)
+            
+            
+%             obj.qA.variance = inv(sum(multiplyTensor(obj.eDFtPtPFD,obj.qSigma.mean),3)...
+%                     +eye(obj.data.M));
+                
+            
+%             for i = 1:obj.data.I
+                
+%                 sum_k=0;
+%                 for k = 1:obj.data.K
+%                     sum_k = sum_k + obj.qSigma.mean(k)*obj.eD(:,:,k)*obj.qF.mean'*obj.qP.mean(:,:,k)'*obj.data.X(i,:,k)';
+%                 end
+%                 
+% %                 check_ELBO(obj,ELBO_prev,obj.qA.varname,'variance',obj.debugflag)
+% %                 ELBO_prev = obj.ELBO;
+%                 obj.qA.mean(i,:) = obj.qA.variance*sum_k;
+% %                 check_ELBO(obj,ELBO_prev,obj.qA.varname,'mean',obj.debugflag)
+%             end
+
+            
             %
             %             ELBO_prev = obj.ELBO;
             obj.qA.variance = inv(sum(multiplyTensor(obj.eDFtPtPFD,obj.qSigma.mean),3)...
@@ -337,7 +410,7 @@ classdef varDistributionC < handle
             K = obj.data.K;
             sum_k = sum(mtimesx(reshape(qSigmaMean,1,1,obj.data.K),mtimesx(mtimesx(mtimesx(qD,qFMeanT),qPMeanT),dataXT)),3);
             obj.qA.mean = (qAvariance*sum_k)';
-            
+%             
         end
         
         % ### Variational Factor C
@@ -463,7 +536,7 @@ classdef varDistributionC < handle
         function updateqSigma(obj)
             for k = 1:obj.data.K
                 %ELBO_prev = obj.ELBO;
-                obj.qSigma.alpha(k) = obj.pSigma.alpha+obj.data.J*obj.data.I/2;
+                obj.qSigma.alpha(k) = obj.pSigma.alpha+obj.data.I*obj.data.J/2;
             end
             obj.qSigma.beta = 1./(1./obj.pSigma.beta+1/2*sum(obj.eAiDFtPtPFDAi,1)...
                 +1/2*obj.XInnerProduct...
@@ -472,6 +545,8 @@ classdef varDistributionC < handle
                 mtimesx(obj.qA.mean,mtimesx(obj.eD,mtimesx(obj.qF.mean',permute(obj.qP.mean,[2 1 3]))))...
                 ,obj.data.X),1),2))');
         end
+        
+        
         
         % ### Variational Factor Alpha
         function updateqAlpha(obj)

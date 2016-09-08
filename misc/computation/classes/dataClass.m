@@ -19,6 +19,7 @@ classdef dataClass < handle
         Mtrue = [] % True number of components
         
         iter
+        ELBOall
     end
     
     properties
