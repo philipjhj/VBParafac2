@@ -580,11 +580,14 @@ classdef varDistributionC < handle
         % ## First order
         
         function compute_eD(obj)
-            value = zeros(obj.data.M,obj.data.M,obj.data.K);
-            for k = 1:obj.data.K
-                value(:,:,k) = diag(obj.qC.mean(k,:));
-            end
-            obj.eD = value;
+%             value = zeros(obj.data.M,obj.data.M,obj.data.K);
+%             for k = 1:obj.data.K
+%                 value(:,:,k) = diag(obj.qC.mean(k,:));
+%             end
+%             obj.eD = value;
+            obj.eD = bsxfun(@mtimes,reshape(obj.qC.mean',1,...
+                obj.data.M,obj.data.K),...
+                repmat(eye(obj.data.M),1,1,obj.data.K));
         end
         
         % ## Second or Higher Order

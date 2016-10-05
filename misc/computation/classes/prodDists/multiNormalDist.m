@@ -219,6 +219,9 @@ classdef multiNormalDist < probabilityDist
                     value(:,:,i) = obj.variance(:,:,i) + ...
                         obj.mean(i,:)'*obj.mean(i,:);
                 end
+                
+                bsxfun(@(mu,var) mu'*mu+var,reshape(obj.mean',1,obj.arrayDim(2),obj.arrayDim(1)),obj.variance)
+                
             else
                 % 3D
                 K = obj.arrayDim(3);

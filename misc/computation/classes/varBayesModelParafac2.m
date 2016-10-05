@@ -91,8 +91,14 @@ classdef varBayesModelParafac2 < handle
         
         function restartqDist(obj)
             clear obj.qDist;
+%             rng(3)
             obj.qDist = varDistributionC(obj);
+            obj.data.iter = [];
             
+            obj.n_components = [];
+            obj.evaltime = [];
+            obj.n_components(1) = sum(sum(obj.qDist.qC.mean)~=0);
+            obj.evaltime(1) = 0;
             
         end
         
