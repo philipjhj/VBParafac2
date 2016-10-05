@@ -24,8 +24,9 @@ myModel=varBayesModelParafac2(data,Mesti);
 myModel.qDist.debugflag = 0;
 myModel.verbose = 1;
 % myModel.qDist.method = 'vonmises';
-myModel.qDist.method = 'parafac2svd';
-
+myModel.qDist.methodPesti = 'parafac2svd';
+myModel.qDist.methodMatrixProduct = 'mtimesx';
+myModel.showIter = 1;
 % myModel.maxTime = realmax;
 
 %myModel.qDist.SNR
@@ -37,8 +38,8 @@ myModel.qDist.activeParams_opt = {'qP','qA','qC','qF','qAlpha','qSigma'};
 % clc
 % myModel.data.iter = myModel.data.iter-1;
 tic
-myModel.computeVarDistribution;
-toctio
+myModel.computeVarDistribution(10);
+toc
 %myModel.qDist.SNR
 %%
 figure

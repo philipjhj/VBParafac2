@@ -21,7 +21,8 @@ classdef varDistributionC < handle
         qAlpha
         
         % Settings
-        method='parafac2svd' % Method used to approximate E(qP)
+        methodPesti='parafac2svd' % Method used to approximate E(qP)
+        methodMatrixProduct = 'mtimesx'
         debugflag = 1
         activeParams_opt = {'qA','qC','qF','qP','qSigma','qAlpha'}
         
@@ -91,6 +92,17 @@ classdef varDistributionC < handle
             obj.pSigma = GammaDist('pSigma',[1 1]);
             obj.pAlpha = GammaDist('pAlpha',[1 1]);
             
+            
+            
+            if strcmp(obj.methodMatrixProduct,'gpu')
+                all_params = {'qA','qC','qF','qP'};
+                for i  = 1:numel(all_params)
+                    obj.(all_params{i}).mean = gpuArray(obj.(all_params{i}).mean);
+                    obj.(all_params{i}).variance = gpuArray(obj.(all_params{i}).variance);
+                end
+            end
+            
+            
             obj.XInnerProduct = obj.computeXInnerProduct;
             
             % Use same initialization as the original parafac2 code
@@ -111,9 +123,9 @@ classdef varDistributionC < handle
             obj.compute_eAiDFtPtPFDAi;
             
             % Initialize ELBO terms
+            
+            
             all_params = {'qA','qC','qF','qP','qSigma','qAlpha'};
-            
-            
             for i  = 1:numel(all_params)
                 obj.(all_params{i}).updateStatistics;
                 
@@ -212,7 +224,7 @@ classdef varDistributionC < handle
             qFMean = obj.qF.mean;
             qDMean = obj.eD;
             
-            t3 = mtimesx(mtimesx(mtimesx(dataX,qPMean),qFMean),qDMean);
+            t3 = matrixProductPrSlab(obj,matrixProductPrSlab(obj,matrixProductPrSlab(obj,dataX,qPMean),qFMean),qDMean);
             
             t3sum = sum(sum(sum(multiplyTensor(t3,obj.qSigma.mean),3).*obj.qA.mean));
             
@@ -408,7 +420,9 @@ classdef varDistributionC < handle
             qAvariance = obj.qA.variance;
             
             K = obj.data.K;
-            sum_k = sum(mtimesx(reshape(qSigmaMean,1,1,obj.data.K),mtimesx(mtimesx(mtimesx(qD,qFMeanT),qPMeanT),dataXT)),3);
+            sum_k = sum(bsxfun(@times,reshape(qSigmaMean,1,1,obj.data.K),...
+                matrixProductPrSlab(obj,matrixProductPrSlab(obj,...
+                matrixProductPrSlab(obj,qD,qFMeanT),qPMeanT),dataXT)),3);
             obj.qA.mean = (qAvariance*sum_k)';
 %             
         end
@@ -432,28 +446,28 @@ classdef varDistributionC < handle
             % Below code replaces a loop over m.
             % the bsxfun as index for ePtP gets the diagonals
             
-            obj.qF.variance = multinv(bsxfun(@plus,squeeze(sum(bsxfun(@times,mtimesx(...
+            obj.qF.variance = multinv(bsxfun(@plus,squeeze(sum(bsxfun(@times,bsxfun(@times,...
                 reshape(obj.qSigma.mean,1,1,obj.data.K),...
                 bsxfun(@times,obj.eCtC,obj.qA.meanOuterProduct)),...
                 reshape(obj.ePtP(bsxfun(@plus,[1:p+1:p*p]',[0:n-1]*p*p))',1,1,n,p)),3)),eye(obj.data.M)));
             
             
             
-            t2=squeeze(sum(mtimesx(reshape(obj.qSigma.mean,1,1,obj.data.K),...
-                mtimesx(permute(obj.qP.mean,[4 1 3 2]),...
-                mtimesx(permute(obj.data.X,[2 1 3]),...
-                mtimesx(obj.qA.mean,obj.eD)))),3));
+            t2=squeeze(sum(bsxfun(@times,reshape(obj.qSigma.mean,1,1,obj.data.K),...
+                matrixProductPrSlab(obj,permute(obj.qP.mean,[2 1 3]),...
+                matrixProductPrSlab(obj,permute(obj.data.X,[2 1 3]),...
+                matrixProductPrSlab(obj,obj.qA.mean,obj.eD)))),3));
             
             
             for m = 1:obj.data.M
                 allButM = 1:obj.data.M~=m;
                 tempMean = obj.qF.mean;
                 
-                t1=sum(mtimesx(reshape(obj.qSigma.mean,1,1,obj.data.K),...
-                    mtimesx(bsxfun(@times,obj.eCtC,obj.qA.meanOuterProduct),...
+                t1=sum(bsxfun(@times,reshape(obj.qSigma.mean,1,1,obj.data.K),...
+                    matrixProductPrSlab(obj,bsxfun(@times,obj.eCtC,obj.qA.meanOuterProduct),...
                     sum(bsxfun(@times,obj.ePtP(m,allButM,:),tempMean(allButM,:)'),2))),3)';
                 
-                obj.qF.mean(m,:) = (t2(:,m)'-t1)*obj.qF.variance(:,:,m);
+                obj.qF.mean(m,:) = (t2(m,:)-t1)*obj.qF.variance(:,:,m);
             end
             
             
@@ -461,7 +475,7 @@ classdef varDistributionC < handle
         end
         % ### Variational Factor P
         function updateqP(obj)
-            if ~strcmp(obj.method,'vonmises')
+            if ~strcmp(obj.methodPesti,'vonmises')
                 for k = 1:obj.data.K
                     obj.qP.variance(:,:,1,k) = inv(obj.qSigma.mean(k)*...
                         (obj.qF.computeMeanInnerProductScaledSlabs(obj.eCtC(:,:,k).*...
@@ -472,7 +486,7 @@ classdef varDistributionC < handle
         end
         
         function computeqPmean(obj)
-            if strcmp(obj.method,'manopt')
+            if strcmp(obj.methodPesti,'manopt')
                 
                 manifold = stiefelfactory(obj.data.J,obj.data.M);
                 problem.M = manifold;
@@ -498,7 +512,7 @@ classdef varDistributionC < handle
                     
                 end
                 
-            elseif strcmp(obj.method,'vonmises')
+            elseif strcmp(obj.methodPesti,'vonmises')
                 obj.qPvonmisesEntropy = 0;
                 for k=1:obj.data.K
                     A = obj.qA.mean*obj.eD(:,:,k)*obj.qF.mean';
@@ -512,7 +526,7 @@ classdef varDistributionC < handle
                     obj.qP.mean(:,:,k) = E_Z';
                     obj.qPvonmisesEntropy = obj.qPvonmisesEntropy+H_Z;
                 end
-            elseif strcmp(obj.method,'parafac2svd')
+            elseif strcmp(obj.methodPesti,'parafac2svd')
                 
                 for k = 1:obj.data.K
                     [U,~,V] = svd(obj.qF.mean*obj.eD(:,:,k)*obj.qA.mean'*obj.data.X(:,:,k),'econ');
@@ -542,7 +556,10 @@ classdef varDistributionC < handle
                 +1/2*obj.XInnerProduct...
                 -squeeze(sum(sum(...
                 bsxfun(@times,...
-                mtimesx(obj.qA.mean,mtimesx(obj.eD,mtimesx(obj.qF.mean',permute(obj.qP.mean,[2 1 3]))))...
+                matrixProductPrSlab(obj,obj.qA.mean,...
+                matrixProductPrSlab(obj,obj.eD,...
+                matrixProductPrSlab(obj,obj.qF.mean',...
+                permute(obj.qP.mean,[2 1 3]))))...
                 ,obj.data.X),1),2))');
         end
         
@@ -576,7 +593,7 @@ classdef varDistributionC < handle
         end
         
         function compute_ePtP(obj)
-            if strcmp(obj.method,'vonmises')
+            if strcmp(obj.methodPesti,'vonmises')
                 obj.ePtP = repmat(eye(obj.data.M),1,1,obj.data.K);
             else
                 obj.ePtP = obj.data.J*squeeze(obj.qP.variance)+repmat(eye(obj.data.M),1,1,obj.data.K);%repmat(eye(obj.data.M),1,1,obj.data.K);
@@ -638,6 +655,40 @@ classdef varDistributionC < handle
         end
         
         % #################################################################
+        % # Utility Functions
+        
+        function C = matrixProductPrSlab(obj,A,B)
+            % Computes the matrix product C = A*B with the defined method
+           
+            switch obj.methodMatrixProduct
+                case 'gpu'
+                    C = pagefun(@mtimes,A,B);
+                    % C = gather(C);
+                    
+                case 'naive'
+                    K = max(size(A,3),size(B,3));
+                    C = zeros(size(A,1),size(B,2),K);
+                    for k = 1:K
+                        if size(A,3) > 1 && size(B,3) > 1
+                            C(:,:,k) = A(:,:,k)*B(:,:,k);
+                        elseif size(A,3) > 1
+                            C(:,:,k) = A(:,:,k)*B;
+                        else
+                            C(:,:,k) = A*B(:,:,k);
+                        end
+                            
+                    end
+                    
+                case 'mtimesx'
+                    C = mtimesx(A,B);
+                    
+                case 'mmx'
+                    C = mmx('mult',A,B);
+            end
+        end
+        
+        
+        % #################################################################
         % # Display methods
         function displayPrivateDependent(obj)
             privateDependentProps = {'ePtP','eFtPtPF','eCtC','eSigmaInv'};
@@ -649,6 +700,10 @@ classdef varDistributionC < handle
         
     end
 end
+
+
+
+
 
 % function check_variance_matrix(variance,debugflag)
 % if debugflag

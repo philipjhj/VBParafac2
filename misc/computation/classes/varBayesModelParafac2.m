@@ -183,16 +183,17 @@ classdef varBayesModelParafac2 < handle
                 fprintf('\n\n');
             
             end
+            
             % Stop Criteria Message
-            
-            if diff/abs(ELBO) < obj.tol
-                fprintf('CAVI has converged with last change %f\n', abs(diff)/abs(ELBO))
-            elseif obj.maxiter <= obj.data.iter
-                fprintf('CAVI has stopped at iteration %d (max iteration) with change %f\n',obj.data.iter,abs(diff)/abs(ELBO))
-            elseif obj.maxTime <= obj.evaltime(max(obj.data.iter,1))
-                fprintf('CAVI has stopped after %f s. evaluation (max time) with change %f\n',obj.data.iter,abs(diff)/abs(ELBO))
+            if obj.verbose
+                if diff/abs(ELBO) < obj.tol
+                    fprintf('CAVI has converged with last change %f\n', abs(diff)/abs(ELBO))
+                elseif obj.maxiter <= obj.data.iter
+                    fprintf('CAVI has stopped at iteration %d (max iteration) with change %f\n',obj.data.iter,abs(diff)/abs(ELBO))
+                elseif obj.maxTime <= obj.evaltime(max(obj.data.iter,1))
+                    fprintf('CAVI has stopped after %f s. evaluation (max time) with change %f\n',obj.data.iter,abs(diff)/abs(ELBO))
+                end
             end
-            
             
             % Trim preallocated memory 
             obj.ELBO_chain = nonzeros(obj.ELBO_chain)';
