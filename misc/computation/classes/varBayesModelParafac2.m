@@ -8,15 +8,10 @@ classdef varBayesModelParafac2 < handle
         % Variational Distribution
         qDist
         
-        % Settings
-        verbose = 1; % 1, display, 0 hide everything
-        maxiter
-        maxTime
-        tol = 1e-7;
-        showIter = 500;
-    end
-    properties
         data
+        util
+        opts
+        % TODO: add statistics class
     end
     
     properties (Dependent)
@@ -50,8 +45,11 @@ classdef varBayesModelParafac2 < handle
             
             %             mtimesx('SPEED');
             
-            obj.maxTime = realmax;
             obj.data = dataClass;
+            obj.opts = optionsClass;
+            obj.util = utilitiesClass(obj);
+            
+            obj.opts.maxTime = realmax;
             
             % Some dims to test
             I = 100;
@@ -104,9 +102,9 @@ classdef varBayesModelParafac2 < handle
         
         function status = computeVarDistribution(obj,maxiter)
             
-            if obj.verbose
+            if obj.opts.verbose
             disp('Starting CAVI with:')
-            disp(obj.qDist.activeParams)
+            disp(obj.qDist.opts.activeParams)
 %             disp('\n')
             end
             
@@ -114,10 +112,10 @@ classdef varBayesModelParafac2 < handle
             % of the probabilistic Parafac2 model
             
             % Set options and meta data
-            if nargin < 2 && isempty(obj.maxiter)
-                obj.maxiter = intmax;
-            elseif isempty(obj.maxiter)
-                obj.maxiter = maxiter;
+            if nargin < 2 && isempty(obj.opts.maxiter)
+                obj.opts.maxiter = intmax;
+            elseif isempty(obj.opts.maxiter) || obj.opts.maxiter < maxiter
+                obj.opts.maxiter = maxiter;
             end
             
             status = 0;
@@ -131,14 +129,14 @@ classdef varBayesModelParafac2 < handle
             ELBO_prev = 0;
             diff = ELBO-ELBO_prev;
             
-            if obj.verbose
+            if obj.opts.verbose
                 obj.displayHeader;
             end            
             
             % Update Variational Factors until ELBO has converged
             tic;
-            while abs(diff)/abs(ELBO) > obj.tol && obj.maxiter > obj.data.iter...
-                    && obj.maxTime > obj.evaltime(max(obj.data.iter,1))
+            while abs(diff)/abs(ELBO) > obj.opts.tol && obj.opts.maxiter+1 > obj.data.iter...
+                    && obj.opts.maxTime > obj.evaltime(min(obj.data.iter,numel(obj.evaltime)))
                 
                 % Update active (see options) variational factors
                 obj.qDist.updateMoments;
@@ -156,12 +154,12 @@ classdef varBayesModelParafac2 < handle
                     obj.evaltime = [obj.evaltime zeros(1,100)];
                     obj.n_components = [obj.n_components zeros(1,100)];
                 end
-                obj.ELBO_chain(obj.data.iter+1) = ELBO;
-                obj.evaltime(obj.data.iter+1) = toc;
-                obj.n_components(obj.data.iter+1) = sum(sum(obj.qDist.qC.mean)~=0);
+                obj.ELBO_chain(obj.data.iter) = ELBO;
+                obj.evaltime(obj.data.iter) = toc;
+                obj.n_components(obj.data.iter) = sum(sum(obj.qDist.qC.mean)~=0);
                 
                 % Check convergence
-                if diff/abs(ELBO) < -1e-7 && obj.data.iter>0
+                if obj.opts.debugFlag >= 1 && diff/abs(ELBO) < -1e-7 && obj.data.iter>0
                     warning('off','backtrace')
                     warning('At iter %d ELBO not converging; relativ diff. is %.10f, diff; %.4f \n',...
                         obj.data.iter,diff/abs(ELBO),diff)
@@ -174,7 +172,7 @@ classdef varBayesModelParafac2 < handle
                 end
                 
                 % Display Progress
-                if obj.verbose && obj.data.iter ~= 1 && mod(obj.data.iter,obj.showIter) == 0
+                if obj.opts.verbose && obj.data.iter ~= 0 && mod(obj.data.iter,obj.opts.showIter) == 0
                     
                     % Output progress
                     % ...
@@ -184,19 +182,19 @@ classdef varBayesModelParafac2 < handle
                 obj.data.iter = obj.data.iter+1;
             end
             
-            if obj.verbose
+            if obj.opts.verbose
                 obj.displayHeader;
                 fprintf('\n\n');
             
             end
             
             % Stop Criteria Message
-            if obj.verbose
-                if diff/abs(ELBO) < obj.tol
+            if obj.opts.verbose
+                if diff/abs(ELBO) < obj.opts.tol
                     fprintf('CAVI has converged with last change %f\n', abs(diff)/abs(ELBO))
-                elseif obj.maxiter <= obj.data.iter
-                    fprintf('CAVI has stopped at iteration %d (max iteration) with change %f\n',obj.data.iter,abs(diff)/abs(ELBO))
-                elseif obj.maxTime <= obj.evaltime(max(obj.data.iter,1))
+                elseif obj.opts.maxiter <= obj.data.iter
+                    fprintf('CAVI has stopped at iteration %d (max iteration) with change %f\n',obj.data.iter-1,abs(diff)/abs(ELBO))
+                elseif obj.opts.maxTime <= obj.evaltime(max(obj.data.iter,1))
                     fprintf('CAVI has stopped after %f s. evaluation (max time) with change %f\n',obj.data.iter,abs(diff)/abs(ELBO))
                 end
             end
