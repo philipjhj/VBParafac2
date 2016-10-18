@@ -372,7 +372,6 @@ classdef varBayesModelParafac2 < handle
             disp((1-sum_res/sum_x)*100)
             
         end
-        
     end
     
     methods (Static)

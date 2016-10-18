@@ -141,7 +141,7 @@ classdef varDistributionC < handle
             end
             
             obj.computeqXMeanLog
-            
+            obj.qPvonmisesEntropy=0;
             % Uncomment to set values to the ground truth
             %                         obj.qA.mean = [obj.data.Atrue zeros(obj.data.I,obj.data.M-obj.data.Mtrue)];
             %                         obj.qC.mean = [obj.data.Ctrue zeros(obj.data.K,obj.data.M-obj.data.Mtrue)];
@@ -223,6 +223,10 @@ classdef varDistributionC < handle
                 methodStr = strcat(obj.opts.activeParams{i},'Entropy');
                 
                 obj.(methodStr) = obj.(obj.opts.activeParams{i}).entropy;
+            end
+            
+            if strcmp(obj.opts.estimationP,'vonmises')
+                obj.qPEntropy = obj.qPvonmisesEntropy;
             end
             
             % Compute sum of entropies
@@ -322,7 +326,7 @@ classdef varDistributionC < handle
                 
                 %                 ELBO_prev2 = obj.ELBO;
                 
-                if ~ismember(obj.opts.activeParams{i},{'qAlpha','qSigma'}) || obj.data.iter>=100% || obj.data.iter==0
+                if ~ismember(obj.opts.activeParams{i},{'qAlpha','qSigma'}) || obj.data.iter>=25% || obj.data.iter==0
                     
                     methodStr = strcat('update',obj.opts.activeParams{i});
                     obj.(methodStr);
@@ -580,7 +584,7 @@ classdef varDistributionC < handle
                     obj.util.matrixProductPrSlab(obj.eD,obj.qF.mean'));
                 
                 % Estep
-                F=bsxfun(@rdivide,obj.util.matrixProductPrSlab(permute(A,[2 1 3])...
+                F=bsxfun(@times,obj.util.matrixProductPrSlab(permute(A,[2 1 3])...
                     ,obj.data.X),...
                     reshape(obj.qSigma.mean,1,1,obj.data.K)); %/sigma_sq;
                 
