@@ -167,18 +167,24 @@ classdef multiNormalDist < probabilityDist
                 K = 1;
             end
             
+	gpuflag = 0;
+
             if isa(obj.variance,'gpuArray')
-                [~, U, P] = pagefun(@lu,obj.variance);
-                du = pagefun(@diag,U);
-                c = pagefun(det,P) * pagefun(@prod,pagefun(@sign,du));
-                v = pagefun(@log,c) + pagefun(@sum,pagefun(@log,pagefun(@abs,du)));
+                %[~, U, P] = pagefun(@lu,obj.variance);
+                %du = pagefun(@diag,U);
+                %c = pagefun(det,P) * pagefun(@prod,pagefun(@sign,du));
+                %v = pagefun(@log,c) + pagefun(@sum,pagefun(@log,pagefun(@abs,du)));
                 
-                logdetValue = gather(v);
-                logdetValue = sum(sum(logdetValue,4),3);
+                %logdetValue = gather(v);
+                %logdetValue = sum(sum(logdetValue,4),3);
                 
-                value = obj.VarDim*(obj.J/2*(1+log(2*pi)))...
-                            +1/2*logdetValue;
-            else
+                %value = obj.VarDim*(obj.J/2*(1+log(2*pi)))...
+                 %           +1/2*logdetValue;
+		obj.variance = gather(obj.variance);
+		gpuflag = 1;
+end
+
+   %         else
                 value = 0;
                 for i=1:obj.VarDim
                     for k=1:K
@@ -186,8 +192,11 @@ classdef multiNormalDist < probabilityDist
                             +1/2*logdet((obj.variance(:,:,i,k)));
                     end
                 end
-                
-            end
+     		if gpuflag
+			obj.variance = gpuArray(obj.variance);
+		end
+           
+    %        end
             
             
             if obj.VarEqual

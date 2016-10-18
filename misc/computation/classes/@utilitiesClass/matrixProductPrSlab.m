@@ -7,10 +7,30 @@ function C = matrixProductPrSlab(obj,A,B)
 %     return
 % end    
 
+callerFunc = dbstack;
+callerFunc = callerFunc(1).name;
+           
+           
+
+
 method = obj.opts.matrixProductPrSlab;
 
 switch method
     case 'gpu'
+	if ~isa(A,'gpuArray')
+        disp('Input A converted to gpuArray with input:')
+        disp(inputname(2))
+        disp(size(A))
+		disp(callerFunc)
+        A = gpuArray(A);
+	end
+	if ~isa(B,'gpuArray')
+        disp('Input B converted to gpuArray with input:')
+        disp(inputname(3))
+        disp(size(B))
+        disp(callerFunc)
+		B = gpuArray(B);
+	end
         C = pagefun(@mtimes,A,B);
         % C = gather(C);
         

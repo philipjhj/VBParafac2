@@ -12,7 +12,7 @@ M=2;
 Mesti = 8;
 
 dimensions = [I J K M];
-% rng(3)
+rng(3)
 data = varBayesModelParafac2.generateDataFromModel([I J K M],[1e12 1e-6]);
 
 
@@ -39,8 +39,8 @@ myModel.qDist.opts.activeParams = {'qA','qF','qC','qP','qAlpha','qSigma'};
 % myModel.data.iter = myModel.data.iter-1;
 
 tic
-% rng(3)
-myModel.computeVarDistribution(400);
+rng(3)
+myModel.computeVarDistribution(10);
 toc
 %myModel.qDist.SNR
 

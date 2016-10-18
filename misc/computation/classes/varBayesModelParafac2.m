@@ -81,7 +81,11 @@ classdef varBayesModelParafac2 < handle
             
             % Create variational distribution object
             obj.qDist = varDistributionC(obj);
-            obj.n_components(1) = sum(sum(obj.qDist.qC.mean)~=0);
+            if isa(obj.qDist.qC.mean,'gpuArray')
+			obj.n_components(1) = sum(sum(gather(obj.qDist.qC.mean))~=0);
+		else
+                	obj.n_components(1) = sum(sum(obj.qDist.qC.mean)~=0);
+		end 
             obj.evaltime(1) = 0;
             
         end
@@ -95,7 +99,12 @@ classdef varBayesModelParafac2 < handle
             
             obj.n_components = [];
             obj.evaltime = [];
-            obj.n_components(1) = sum(sum(obj.qDist.qC.mean)~=0);
+		if isa(obj.qDist.qC.mean,'gpuArray')
+			obj.n_components(1) = sum(sum(gather(obj.qDist.qC.mean))~=0);
+		else
+                	obj.n_components(1) = sum(sum(obj.qDist.qC.mean)~=0);
+		end  
+
             obj.evaltime(1) = 0;
             
         end
@@ -124,6 +133,12 @@ classdef varBayesModelParafac2 < handle
                 obj.data.iter = 1;
             end
             
+            if obj.data.iter == 1;
+                obj.qDist = obj.qDist.initDist;
+            end
+                
+            
+            
             % Compute Initial ELBO
             ELBO = obj.qDist.ELBO;
             ELBO_prev = 0;
@@ -134,9 +149,9 @@ classdef varBayesModelParafac2 < handle
             end            
             
             % Update Variational Factors until ELBO has converged
-            tic;
+            ticCAVI=tic;
             while abs(diff)/abs(ELBO) > obj.opts.tol && obj.opts.maxiter+1 > obj.data.iter...
-                    && obj.opts.maxTime > obj.evaltime(min(obj.data.iter,numel(obj.evaltime)))
+                    && obj.opts.maxTime > obj.evaltime(max(1,find(obj.evaltime==0,1)-1))
                 
                 % Update active (see options) variational factors
                 obj.qDist.updateMoments;
@@ -155,9 +170,13 @@ classdef varBayesModelParafac2 < handle
                     obj.n_components = [obj.n_components zeros(1,100)];
                 end
                 obj.ELBO_chain(obj.data.iter) = ELBO;
-                obj.evaltime(obj.data.iter) = toc;
-                obj.n_components(obj.data.iter) = sum(sum(obj.qDist.qC.mean)~=0);
-                
+                obj.evaltime(obj.data.iter) = toc(ticCAVI);
+		if isa(obj.qDist.qC.mean,'gpuArray')
+			obj.n_components(obj.data.iter) = sum(sum(gather(obj.qDist.qC.mean))~=0);
+		else
+                	obj.n_components(obj.data.iter) = sum(sum(obj.qDist.qC.mean)~=0);
+		end                
+
                 % Check convergence
                 if obj.opts.debugFlag >= 1 && diff/abs(ELBO) < -1e-7 && obj.data.iter>0
                     warning('off','backtrace')
@@ -336,6 +355,23 @@ classdef varBayesModelParafac2 < handle
             
         end
         
+        function Parafac2Fit(obj)
+            
+            residual=bsxfun(@minus,obj.data.X,obj.util.matrixProductPrSlab(...
+                obj.qDist.qA.mean,obj.util.matrixProductPrSlab(obj.qDist.eD,...
+                obj.util.matrixProductPrSlab(obj.qDist.qF.mean',permute(...
+                obj.qDist.qP.mean,[2 1 3])))));
+            
+            sum_res = 0;
+            sum_x = 0;
+            for k = 1:obj.data.K
+               sum_res = sum_res+norm(residual(:,:,k))^2;
+               sum_x = sum_x + norm(obj.data.X(:,:,k))^2;
+            end
+            
+            disp((1-sum_res/sum_x)*100)
+            
+        end
         
     end
     
