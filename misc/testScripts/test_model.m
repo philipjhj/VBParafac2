@@ -9,7 +9,7 @@ I=50;
 J=50;
 K=10;
 M=2;
-Mesti = 8;
+Mesti = 20;
 
 dimensions = [I J K M];
 rng(3)
@@ -20,30 +20,35 @@ myModel=varBayesModelParafac2(data,Mesti);
 
 % myModel=varBayesModelParafac2(Y,100);
 
-
-myModel.qDist.debugflag = 0;
-myModel.verbose = 1;
-% myModel.qDist.method = 'vonmises';
-myModel.qDist.methodPesti = 'parafac2svd';
-myModel.qDist.methodMatrixProduct = 'mtimesx';
-myModel.showIter = 1;
+myModel.opts.verbose = 1;
+myModel.opts.debugFlag = 1;
+% myModel.opts.estimationP= 'vonmises';
+myModel.opts.estimationP = 'parafac2svd';
+myModel.opts.matrixProductPrSlab = 'mtimesx';
+myModel.opts.showIter = 1;
 % myModel.maxTime = realmax;
 
 %myModel.qDist.SNR
 clc
-myModel.qDist.activeParams_opt = {'qP','qA','qC','qF','qAlpha','qSigma'};
+
+myModel.qDist.opts.activeParams = {'qA','qF','qC','qP','qAlpha','qSigma'};
 % myModel.qDist.activeParams_opt = {'qC','qAlpha'};
 
 
 % clc
+
 % myModel.data.iter = myModel.data.iter-1;
+
 tic
+rng(3)
 myModel.computeVarDistribution(10);
 toc
 %myModel.qDist.SNR
+myModel.Parafac2Fit
 %%
 figure
 for k=1:myModel.data.K
+    
 clf
 
 myModel.plotSolutionSynthK(k,0)

@@ -85,9 +85,9 @@ end
 if use_chol
     v = 2 * sum(log(diag(chol(A))));
 else
-    [L, U, P] = lu(A);
-    du = diag(U);
-    c = det(P) * prod(sign(du));
-    v = log(c) + sum(log(abs(du)));
+        [L, U, P] = lu(A);
+        du = diag(U);
+        c = det(P) * prod(sign(du));
+        v = log(c) + sum(log(abs(du)));
 end
 
