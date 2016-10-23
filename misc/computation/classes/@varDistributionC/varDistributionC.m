@@ -108,13 +108,13 @@ classdef varDistributionC < handle
             
             obj.XInnerProduct = obj.computeXInnerProduct;
             
-            % Use same initialization as the original parafac2 code
-            %             [A,F,C,P]=obj.parafac2([0 0],[0, -1, 0,0,1]);
-            %
-            %             obj.qA.mean = A;
-            %             obj.qC.mean = C;
-            %             obj.qF.mean = F;
-            %             obj.qP.mean = cat(3,P{:});
+            %             Use same initialization as the original parafac2 code
+%             [A,F,C,P]=obj.parafac2([0 0],[0, -1, 0,0,1]);
+%             
+%             obj.qA.mean = A;
+%             obj.qC.mean = C;
+%             obj.qF.mean = F;
+%             obj.qP.mean = cat(3,P{:});
             
             % Initialize Shared Terms
             obj.compute_eD;

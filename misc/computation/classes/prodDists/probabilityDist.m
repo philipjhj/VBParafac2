@@ -35,7 +35,7 @@ classdef probabilityDist < handle
             end
             
             if strcmp(obj.type,'multiNormal')
-                obj.mean = 20*rand(obj.arrayDim);
+                obj.mean = normrnd(0,1,obj.arrayDim);
                 
                 if VarEqualBool
                     obj.VarDim = 1;

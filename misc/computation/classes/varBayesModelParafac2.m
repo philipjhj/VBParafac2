@@ -3,6 +3,7 @@ classdef varBayesModelParafac2 < handle
     
     properties
         ELBO_chain
+        fit_chain
         n_components
         evaltime
         % Variational Distribution
@@ -92,6 +93,7 @@ classdef varBayesModelParafac2 < handle
             obj.data.iter = 1;
             
             obj.ELBO_chain = [];
+            obj.fit_chain = [];
             obj.n_components = [];
             obj.evaltime = [];
             
@@ -161,10 +163,12 @@ classdef varBayesModelParafac2 < handle
                 % Store progress information
                 if isempty(obj.ELBO_chain) || numel(obj.ELBO_chain)<obj.data.iter+1
                     obj.ELBO_chain = [obj.ELBO_chain zeros(1,100)];
+                    obj.fit_chain = [obj.fit_chain zeros(1,100)];
                     obj.evaltime = [obj.evaltime zeros(1,100)];
                     obj.n_components = [obj.n_components zeros(1,100)];
                 end
                 obj.ELBO_chain(obj.data.iter) = ELBO;
+                obj.fit_chain(obj.data.iter) = obj.Parafac2Fit;
                 obj.evaltime(obj.data.iter) = toc(ticCAVI)+startTime;
                 obj.n_components(obj.data.iter) = obj.qDist.nActiveComponents;
                 
@@ -224,6 +228,7 @@ classdef varBayesModelParafac2 < handle
             
             % Trim preallocated memory
             obj.ELBO_chain = nonzeros(obj.ELBO_chain)';
+            obj.fit_chain = nonzeros(obj.fit_chain)';
             obj.evaltime = nonzeros(obj.evaltime)';
             obj.n_components = nonzeros(obj.n_components)';
         end
@@ -270,7 +275,7 @@ classdef varBayesModelParafac2 < handle
             fprintf('%10d',obj.n_components(obj.data.iter));
             fprintf('%10.2e',...
                 diff,...
-                ELBO,obj.Parafac2Fit);
+                ELBO,obj.fit_chain(obj.data.iter));
 %                 obj.qDist.qXMeanLog,obj.qDist.qAMeanLog,obj.qDist.qCMeanLog,...
 %                 obj.qDist.qFMeanLog,obj.qDist.qPMeanLog,obj.qDist.qSigmaMeanLog,...
 %                 obj.qDist.qAlphaMeanLog,obj.qDist.qAEntropy,obj.qDist.qCEntropy,...
@@ -332,6 +337,7 @@ classdef varBayesModelParafac2 < handle
         function plotELBO(obj,plotinterval)
             % Trim preallocated memory
             obj.ELBO_chain = nonzeros(obj.ELBO_chain)';
+            obj.fit_chain = nonzeros(obj.fit_chain)';
             obj.evaltime = nonzeros(obj.evaltime)';
             obj.n_components = nonzeros(obj.n_components)';
             
@@ -405,23 +411,13 @@ classdef varBayesModelParafac2 < handle
         %end
         
         
-        function generatedData = generateDataFromModel(dimensions,precision)
-            %             rng('default')
-            %             rng('shuffle')
+        function generatedData = generateDataFromModel(options)
             
-            if nargin < 2
-%                 SigmaPrecision = 1e4;
-%                 AlphaPrecision = 1e-8;
-            else
-                SigmaPrecision = precision(1);
-                AlphaPrecision = precision(2);
-            end
-            
-            I = dimensions(1);
-            J = dimensions(2);
-            K = dimensions(3);
-            M = dimensions(4);
-            
+            % Init data
+            I = options.dimensions(1);
+            J = options.dimensions(2);
+            K = options.dimensions(3);
+            M = options.dimensions(4);
             
             generatedData = dataClass;
             
@@ -429,39 +425,93 @@ classdef varBayesModelParafac2 < handle
             generatedData.Xtrue = zeros([I J K]);
             generatedData.Mtrue= M;
             
-            %             generatedData.SigmaAtrue = 1e-1;
-            %             generatedData.SigmaBtrue = 1;
-            %             generatedData.AlphaAtrue = 1e2;
-            %             generatedData.AlphaBtrue = 1;
-            
-            %             generatedData.Sigmatrue = gamrnd(generatedData.SigmaAtrue,generatedData.SigmaBtrue,1,generatedData.K);
-            %             generatedData.Alphatrue = gamrnd(generatedData.AlphaAtrue,generatedData.AlphaBtrue,1,generatedData.Mtrue);
-            
-            generatedData.Sigmatrue = repmat(SigmaPrecision,1,generatedData.K);
-            generatedData.Alphatrue = repmat(AlphaPrecision,1,generatedData.Mtrue);
-            
             generatedData.Atrue = mvnrnd(zeros(generatedData.I,generatedData.Mtrue),eye(generatedData.Mtrue));
-            generatedData.Ftrue = mvnrnd(zeros(generatedData.Mtrue,generatedData.Mtrue),eye(generatedData.Mtrue));
             
-            generatedData.Ctrue = mvnrnd(zeros(generatedData.K,generatedData.Mtrue),diag(1./generatedData.Alphatrue));
-            
-            generatedData.Etrue = zeros(generatedData.I,generatedData.J,generatedData.K);
-            generatedData.X = zeros(generatedData.I,generatedData.J,generatedData.K);
-            generatedData.Ptrue = zeros(generatedData.J,generatedData.Mtrue,generatedData.K);
-            
-            for k = 1:generatedData.K
+            if strcmp(options.initMethod,'kiers')
+                F = ones(M,M)*options.congruence;
                 
-                generatedData.Ptrue(:,:,k) = orth(mvnrnd(zeros(generatedData.J,generatedData.Mtrue),eye(generatedData.Mtrue)));
+                for m = 1:M
+                    F(m,m) = 1;
+                end
                 
-                generatedData.Etrue(:,:,k) = mvnrnd(zeros(generatedData.I,generatedData.J)...
-                    ,eye(generatedData.J)*1./generatedData.Sigmatrue(k));
+                generatedData.Ftrue = chol(F);
                 
-                generatedData.Xtrue(:,:,k) = generatedData.Atrue*diag(generatedData.Ctrue(k,:))*...
-                    generatedData.Ftrue'*generatedData.Ptrue(:,:,k)';
+                score = 1;
+                i=0;
+                while any(any(nonzeros(score)>0.8))
+                    C = rand(K,M);
+                    score = congruenceScore(C,C);
+                    i = i+1;
+                end
+                disp(i)
+                generatedData.Ctrue = 10*C;
                 
-                generatedData.X(:,:,k) = generatedData.Xtrue(:,:,k)+generatedData.Etrue(:,:,k);
+                generatedData.Ptrue = zeros(generatedData.J,generatedData.Mtrue,generatedData.K);
+                
+                generatedData.Etrue = zeros(I,J,K);
+                
+                for k = 1:generatedData.K
+                    
+                    generatedData.Ptrue(:,:,k) = orth(mvnrnd(zeros(generatedData.J,generatedData.Mtrue),eye(generatedData.Mtrue)));
+                    
+                    generatedData.Xtrue(:,:,k) = generatedData.Atrue*diag(generatedData.Ctrue(k,:))*...
+                        generatedData.Ftrue'*generatedData.Ptrue(:,:,k)';
+                    
+                    generatedData.X(:,:,k) = generatedData.Xtrue(:,:,k);
+                end
+                
+            elseif strcmp(options.initMethod,'generative')
+                
+                if ~isfield(options,'precision')
+                    SigmaPrecision = 1e12;
+                    AlphaPrecision = 1e-3;
+                else
+                    SigmaPrecision = options.precision(1);
+                    AlphaPrecision = options.precision(2);
+                end
+                
+                generatedData.Sigmatrue = repmat(SigmaPrecision,1,generatedData.K);
+                generatedData.Alphatrue = repmat(AlphaPrecision,1,generatedData.Mtrue);
+                
+                generatedData.Atrue = mvnrnd(zeros(generatedData.I,generatedData.Mtrue),eye(generatedData.Mtrue));
+                
+                generatedData.Ftrue = mvnrnd(zeros(generatedData.Mtrue,generatedData.Mtrue),eye(generatedData.Mtrue));
+                
+                generatedData.Ctrue = mvnrnd(zeros(generatedData.K,generatedData.Mtrue),diag(1./generatedData.Alphatrue));
+                
+                generatedData.Etrue = zeros(generatedData.I,generatedData.J,generatedData.K);
+                
+                generatedData.Ptrue = zeros(generatedData.J,generatedData.Mtrue,generatedData.K);
+                
+                for k = 1:generatedData.K
+                    
+                    generatedData.Ptrue(:,:,k) = orth(mvnrnd(zeros(generatedData.J,generatedData.Mtrue),eye(generatedData.Mtrue)));
+                    
+                    generatedData.Etrue(:,:,k) = mvnrnd(zeros(generatedData.I,generatedData.J)...
+                        ,eye(generatedData.J)*1./generatedData.Sigmatrue(k));
+                    
+                    generatedData.Xtrue(:,:,k) = generatedData.Atrue*diag(generatedData.Ctrue(k,:))*...
+                        generatedData.Ftrue'*generatedData.Ptrue(:,:,k)';
+                    
+                    generatedData.X(:,:,k) = generatedData.Xtrue(:,:,k)+generatedData.Etrue(:,:,k);
+                end
             end
             
+            
         end
+    end
+end
+
+
+
+function score = congruenceScore(x,y)
+    xy = x'*y;
+    xxsq = sqrt(diag(xy));
+    xxyy = xxsq*xxsq';
+    
+    if numel(xy)>1
+        score = triu(xy./(xxyy),1);
+    else
+        score = xy./(xxyy);
     end
 end
