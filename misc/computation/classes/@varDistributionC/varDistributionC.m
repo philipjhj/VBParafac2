@@ -294,26 +294,10 @@ classdef varDistributionC < handle
             first_error = 0;
             
             for i = 1:numel(obj.opts.activeParams)
-                %                 ELBO_prev = obj.ELBO;
                 
-                %                 if any(~ismember(obj.opts.activeParams,'qAlpha'))
-                %                     XMeanLog_prev = obj.qXMeanLog; % Depends on everything but qAlpha
-                %                 else
-                %                     XMeanLog_prev= 0;
-                %                 end
-                
-                %                 if strcmp(obj.opts.activeParams{i},'qAlpha')
-                %                     CMeanLog_prev = obj.qCMeanLog; % Depends on everything but qAlpha
-                %                 else
-                %                     CMeanLog_prev= 0;
-                %                 end
-                
-                %                 methodStr = strcat(obj.opts.activeParams{i},'MeanLog');
-                
-                %                 ELBO_prev = XMeanLog_prev+CMeanLog_prev+...
-                %                     obj.(methodStr)+obj.(obj.opts.activeParams{i}).entropy;
-                
-                %                 ELBO_prev2 = obj.ELBO;
+                if obj.opts.debugFlag > 1
+                    ELBO_prev = obj.ELBO;
+                end
                 
                 if ~ismember(obj.opts.activeParams{i},{'qAlpha','qSigma'}) || obj.data.iter>=25% || obj.data.iter==0
                     
@@ -365,45 +349,34 @@ classdef varDistributionC < handle
                 end
                 
                 
-                %                 if any(~ismember(obj.opts.activeParams,'qAlpha'))
-                %                     obj.computeqXMeanLog;
-                %                     XMeanLog_new = obj.qXMeanLog; % Depends on everything but qAlpha
-                %                 else
-                %                     XMeanLog_new=0;
-                %                 end
-                %
-                %                 if strcmp(obj.opts.activeParams{i},'qAlpha')
-                %                     obj.computeqCMeanLog;
-                %                     CMeanLog_new = obj.qCMeanLog; % Depends on everything but qAlpha
-                %                 else
-                %                     CMeanLog_new= 0;
-                %                 end
-                %
-                %
-                %                 methodStr = strcat('compute',obj.opts.activeParams{i},'MeanLog');
-                %                 obj.(methodStr);
-                %
-                %                 methodStr = strcat(obj.opts.activeParams{i},'MeanLog');
-                %
-                %                 ELBO_new = XMeanLog_new+CMeanLog_new+...
-                %                     obj.(methodStr)+obj.(obj.opts.activeParams{i}).entropy;
-                %
-                %                 ELBO_new2 = obj.ELBO;
+                if obj.opts.debugFlag > 1
+                    obj.compute_eD;
+                    obj.compute_eCtC;
+                    obj.compute_eCsquared;
+                    obj.compute_ePtP;
+                    obj.compute_eFtPtPF;
+                    obj.compute_eDFtPtPFD;
+                    obj.compute_eAiDFtPtPFDAi;
+                    
+                    
+                    
+                    ELBO_new = obj.ELBO;
+                    
+                    if (ELBO_new-ELBO_prev)/abs(ELBO_new) < -1e-8 && obj.data.iter > 1
+                        %                     any_error = 1;
+                        %                     if ~first_error
+                        %                         first_error = 1;
+                        %                         fprintf('\n');
+                        %                     end
+                        warning('off','backtrace')
+                        warning(sprintf('varDist:Update:%s',obj.opts.activeParams{i}),...
+                            'Update problem; ELBO absolute/relative change for %s update is %f \t %d\n',obj.opts.activeParams{i},...
+                            ELBO_new-ELBO_prev,(ELBO_new-ELBO_prev)/abs(ELBO_new));
+                        warning('on','backtrace')
+                    end
+                    obj.data.ELBOall = [obj.data.ELBOall obj.ELBO];
+                end
                 
-                %                 if obj.opts.debugFlag > 1 && (ELBO_new-ELBO_prev)/abs(ELBO_new) < -1e-8 && obj.data.iter > 0
-                %                     any_error = 1;
-                %                     if ~first_error
-                %                         first_error = 1;
-                %                         fprintf('\n');
-                %                     end
-                %                     warning('off','backtrace')
-                %                     warning(sprintf('varDist:Update:%s',obj.opts.activeParams{i}),...
-                %                         'Update problem; ELBO absolute/relative change for %s update is %f / %f \t %f\n',obj.opts.activeParams{i},...
-                %                         ELBO_new-ELBO_prev,(ELBO_new-ELBO_prev)/abs(ELBO_new),(ELBO_new2-ELBO_prev2)/abs(ELBO_new2));
-                %                     warning('on','backtrace')
-                %                 end
-                
-                obj.data.ELBOall = [obj.data.ELBOall obj.ELBO];
             end
             if any_error
                 fprintf('\n')
