@@ -5,6 +5,7 @@ classdef dataClass < handle
         M
         
         % True latent variables (if generated)
+        Xtrue = []
         Atrue = []
         Ctrue = []
         Ftrue = []

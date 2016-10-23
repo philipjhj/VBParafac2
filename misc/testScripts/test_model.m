@@ -1,7 +1,7 @@
 load('/media/data/DataAndResults/Thesis/motor_normalized_all_subs.mat')
 %%
 
-% warning on MATLAB:nearlySingularMatrix
+% warning off MATLAB:nearlySingularMatrix
 
 % myModel=varBayesModelParafac2;
 
@@ -13,7 +13,7 @@ Mesti = 20;
 
 dimensions = [I J K M];
 rng(3)
-data = varBayesModelParafac2.generateDataFromModel([I J K M],[1e12 1e-6]);
+data = varBayesModelParafac2.generateDataFromModel([I J K M],[1e12 1e-3]);
 
 
 myModel=varBayesModelParafac2(data,Mesti);
@@ -24,12 +24,24 @@ myModel.opts.verbose = 1;
 myModel.opts.debugFlag = 1;
 % myModel.opts.estimationP= 'vonmises';
 myModel.opts.estimationP = 'parafac2svd';
+myModel.opts.estimationARD = 'avg';
 myModel.opts.matrixProductPrSlab = 'mtimesx';
+myModel.opts.nActiveComponents = 'hard';
 myModel.opts.showIter = 1;
-% myModel.maxTime = realmax;
+myModel.opts.rngInput = 1461191309;%'shuffle';
+
+% data set; rng(3)
+% seed; 1461191309
+% iter (avg); 441
+% iter (max); 44
+
+% myModel.opts.maxTime = 1;
+
+
+
 
 %myModel.qDist.SNR
-clc
+% clc
 
 myModel.qDist.opts.activeParams = {'qA','qF','qC','qP','qAlpha','qSigma'};
 % myModel.qDist.activeParams_opt = {'qC','qAlpha'};
@@ -38,15 +50,15 @@ myModel.qDist.opts.activeParams = {'qA','qF','qC','qP','qAlpha','qSigma'};
 % clc
 
 % myModel.data.iter = myModel.data.iter-1;
-
+% myModel.restartqDist;
+% myModel.opts.maxTime = 5;
 tic
-rng(3)
 myModel.computeVarDistribution(10);
 toc
 %myModel.qDist.SNR
 myModel.Parafac2Fit
 %%
-figure
+
 for k=1:myModel.data.K
     
 clf

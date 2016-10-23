@@ -80,6 +80,11 @@ classdef varDistributionC < handle
             obj.opts = modelobj.opts;
             obj.util = modelobj.util;
             
+        end
+        
+        
+        function obj = initDist(obj)
+            
             % Initialize distribution classes
             obj.qA = multiNormalDist('qA',[obj.data.I obj.data.M],true,obj.util);
             obj.qC = multiNormalDist('qC',[obj.data.K obj.data.M],false,obj.util);
@@ -90,11 +95,6 @@ classdef varDistributionC < handle
             
             obj.pSigma = GammaDist('pSigma',[1 1]);
             obj.pAlpha = GammaDist('pAlpha',[1 1]);
-            
-        end
-        
-        
-        function obj = initDist(obj)
             
             if strcmp(obj.opts.matrixProductPrSlab,'gpu')
                 all_params = {'qA','qC','qF','qP'};
@@ -154,27 +154,6 @@ classdef varDistributionC < handle
             
         end
         
-        
-        %
-        %         function set.opts.activeParams(obj,value)
-        %             all_params = {'qP','qF','qC','qA','qSigma','qAlpha'};
-        %             obj.opts.activeParams = value;
-        %             obj.activeParams = all_params(ismember(all_params,obj.opts.activeParams));
-        %         end
-        %
-        %         function set.opts.MatrixProduct(obj,value)
-        %            obj.methodMatrixProduct = value;
-        %            obj.util.opt_matrixProductPrSlab = obj.methodMatrixProduct;
-        %         end
-        %
-        %         function set.opts(obj,value)
-        %             obj = obj;
-        %             disp(value);
-        %         end
-        %
-        function SNR(obj)
-            disp(norm(obj.data.X(:))^2/norm(obj.data.Etrue(:))^2)
-        end
         
         % Function by Rasmus Bro to get initial values
         [A,H,C,P,fit,AddiOutput] = parafac2(obj,Constraints,Options,A,H,C,P);
@@ -742,6 +721,24 @@ classdef varDistributionC < handle
             value = squeeze(sum(sum(obj.data.X.^2,1),2))';
             
         end
+        
+        % #################################################################
+        % # Statistics methods
+        
+        function nActive = nActiveComponents(obj)
+            
+            if strcmp(obj.opts.nActiveComponents,'hard')
+                if isa(obj.qC.mean,'gpuArray')
+                    nActive = sum(sum(gather(obj.qC.mean))~=0);
+                else
+                    nActive = sum(sum(obj.qC.mean)~=0);
+                end
+            elseif strcmp(obj.opts.nActiveComponents,'threshold')
+                nActive = find(cumsum(sort(1./obj.qAlpha.mean,'descend')/sum(1./obj.qAlpha.mean))>0.95,1);
+            end
+        end
+        
+        
         
         % #################################################################
         % # Display methods

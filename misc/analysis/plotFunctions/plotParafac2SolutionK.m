@@ -1,4 +1,4 @@
-function plotParafac2SolutionK(k,X,A,C,F,P,Atrue,Ctrue,Ftrue,Ptrue,MLEflag,Etrue)
+function plotParafac2SolutionK(k,X,A,C,F,P,Atrue,Ctrue,Ftrue,Ptrue,MLEflag,nActive,sortOrder)
 
 
 M = size(A,2);
@@ -6,15 +6,109 @@ Mtrue = size(Atrue,2);
 
 % K = size(X,3);
 
-xRecon = A*diag(C(k,:))*F'*P(:,:,k)';
 
-estiCell = {xRecon,A,C,F,P};
-trueCell = {X,Atrue,Ctrue,Ftrue,Ptrue};
+
+
+xRecon = A*diag(C(k,:))*F'*P(:,:,k)';
+FtPt = F'*P(:,:,k)';
+
+FtPtTrue = Ftrue'*Ptrue(:,:,k)';
+
+
+
+% CtrueScale = max(abs(Ctrue)');
+% Ctrue = bsxfun(@times,1./CtrueScale,Ctrue')';
+% [~,sortOrderTrue] = sort(abs(Ctrue(k,:)),'descend');
+% 
+
+
+AtrueScale = max(abs(Atrue));
+Atrue = bsxfun(@times,1./AtrueScale,Atrue);
+
+FtPtTrueScale = max(abs(FtPtTrue),[],2);
+FtPtTrue = bsxfun(@times,1./FtPtTrueScale,FtPtTrue);
+
+
+Ctrue(k,:) = Ctrue(k,:).*AtrueScale*diag(FtPtTrueScale);
+
+[~,sortOrderTrue] = sort(abs(Ctrue(k,:)),'descend');
+
+% CScale = max(abs(C)');
+% C = bsxfun(@times,1./CScale,C')';
+% [~,sortOrder] = sort(abs(C(k,:)),'descend');
+
+AScale = max(abs(A));
+A = bsxfun(@times,1./AScale,A);
+
+FtPtScale = max(abs(FtPt),[],2);
+FtPtScale(FtPtScale<10e-16) = 0;
+
+FtPt = bsxfun(@times,1./FtPtScale,FtPt);
+FtPt(isinf(FtPt)) = 0;
+
+C(k,:) = C(k,:).*AScale*diag(FtPtScale);
+
+[~,sortOrder] = sort(abs(C(k,:)),'descend');
+
+% sort out ratio
+K = numel(sortOrderTrue);
+
+% CRatioScale = 1./C(k,sortOrder(1:K)).*abs(Ctrue(k,sortOrderTrue));
+% C(k,sortOrder(1:K)) = sign(C(k,sortOrder(1:K))).*abs(Ctrue(k,sortOrderTrue));
+% A(:,sortOrder(1:K)) = bsxfun(@times,1./CRatioScale,A(:,sortOrder(1:K)));
+% 
+
+
+signATrue = sign(Atrue(1,:));
+signA = sign(A(1,:));
+
+signFtPtTrue = sign(FtPtTrue(:,1));
+signFtPt = sign(FtPt(:,1));
+
+signCTrue = sign(Ctrue(k,:));
+signC = sign(C(k,:));
+
+% signC(sortOrder)
+% signCTrue(sortOrderTrue)
+signA(sortOrder)
+signATrue(sortOrderTrue)
+% for i = 1:numel(signAFtPtTrue)
+%     disp(signAFtPtTrue(i) ~= signAFtPt(i))
+%     if signAFtPtTrue(i) ~= signAFtPt(i)
+%        A(:,sortOrder(i)) = -1*A(:,sortOrder(i));
+%        FtPt(sortOrder(i),:) = -1*FtPt(sortOrder(i),:);
+%     end
+% end
+
+
+for i = 1:numel(signCTrue)
+%     disp('sign')
+%     disp(signCTrue(sortOrderTrue(i)) ~= signC(sortOrder(i)))
+    disp('A sign')
+    disp(signATrue(sortOrderTrue(i)) ~= signA(sortOrder(i)))
+    if signCTrue(sortOrderTrue(i)) ~= signC(sortOrder(i))
+        
+        C(k,sortOrder(i)) = -1*C(k,sortOrder(i));
+        
+        if signATrue(sortOrderTrue(i)) ~= signA(sortOrder(i))
+            A(:,sortOrder(i)) = -1*A(:,sortOrder(i));
+        else
+            FtPt(sortOrder(i),:) = -1*FtPt(sortOrder(i),:);
+        end
+    elseif signATrue(sortOrderTrue(i)) ~= signA(sortOrder(i))
+            A(:,sortOrder(i)) = -1*A(:,sortOrder(i));
+            FtPt(sortOrder(i),:) = -1*FtPt(sortOrder(i),:);
+    end
+end
+
+estiCell = {xRecon,A,C,FtPt,F,P};
+trueCell = {X,Atrue,Ctrue,FtPtTrue,Ftrue,Ptrue};
 
 
 titleTrueCell ={'Xk, k=',
     'A True',
     'diag(C_k True)',
+    'FtPt True',
     'F True',
     'Pk True'};
 
@@ -22,6 +116,7 @@ titleTrueCell ={'Xk, k=',
 titleEstiCell = {'Xk estimate, k =',
     'qA mean',
     'diag(qC_k mean)',
+    'FtPt'
     'qF mean',
     'qPk mean'};
 
@@ -66,7 +161,8 @@ else
 end
 
 
-ha=tight_subplot(nRows,5,[0.1 0.02],[0.01 0.05],[0.015 0.015]);
+nCols = 6;
+ha=tight_subplot(nRows,nCols,[0.1 0.02],[0.01 0.05],[0.015 0.015]);
 
 
 if M == Mtrue;
@@ -87,7 +183,7 @@ end
 axes(ha(1))
 displayImageValues(trueCell{1}(:,:,k),strcat(titleTrueCell{1},num2str(k)),colorInterval)%
 colorbar
-axes(ha(6))
+axes(ha(nCols+1))
 displayImageValues(estiCell{1},strcat(titleEstiCell{1},num2str(k)),colorInterval)
 colorbar
 if MLEflag
@@ -100,23 +196,26 @@ end
 % ### Others
 for i = 2:numel(trueCell)
     
-    if all(i ~= [3,5])
-        myImageTrue = trueCell{i}(:,compOrderTrue);
-        myImageEsti = estiCell{i}(:,compOrderEsti)*diag(signs(1,:));
+    if all(i ~= [3,4,6])
+        myImageTrue = trueCell{i}(:,sortOrderTrue);
+        myImageEsti = estiCell{i}(:,sortOrder);
         if MLEflag
-            myImageMLE = mleCell{i}(:,compOrderMLE)*diag(signs(2,:));
+            myImageMLE = mleCell{i}(:,sortOrder);
         end
-    elseif i == 3
-        myImageTrue = diag(trueCell{i}(k,compOrderTrue));
-        myImageEsti = diag(estiCell{i}(k,compOrderEsti))*diag(signs(1,:));
+    elseif i == 3 % qC
+        myImageTrue = diag(trueCell{i}(k,sortOrderTrue));
+        myImageEsti = diag(estiCell{i}(k,sortOrder));
         if MLEflag
-            myImageMLE = diag(mleCell{i}(k,compOrderMLE))*diag(signs(2,:));
+            myImageMLE = diag(mleCell{i}(k,:));
         end
-    elseif i == 5
-        myImageTrue = trueCell{i}(:,compOrderTrue,k);
-        myImageEsti = estiCell{i}(:,compOrderEsti,k)*diag(signs(1,:));
+    elseif i == 4 % FtPt
+        myImageTrue = trueCell{i}(sortOrderTrue,:);
+        myImageEsti = estiCell{i}(sortOrder,:);
+    elseif i == 6
+        myImageTrue = trueCell{i}(:,sortOrderTrue,k);
+        myImageEsti = estiCell{i}(:,sortOrder,k);
         if MLEflag
-            myImageMLE = mleCell{i}(:,compOrderMLE,k)*diag(signs(2,:));
+            myImageMLE = mleCell{i}(:,:,k);
         end
     end
     
@@ -127,7 +226,7 @@ for i = 2:numel(trueCell)
         addValuesToImage(myImageTrue)
     end
     
-    axes(ha(i+5))
+    axes(ha(i+nCols))
     displayImageValues(myImageEsti,titleEstiCell{i},colorInterval)
     
     if i == 3
@@ -142,6 +241,51 @@ for i = 2:numel(trueCell)
         end
     end
 end
+
+% for i = 2:numel(trueCell)
+%     
+%     if all(i ~= [3,6])
+%         myImageTrue = trueCell{i}(:,compOrderTrue);
+%         myImageEsti = estiCell{i}(:,compOrderEsti)*diag(signs(1,:));
+%         if MLEflag
+%             myImageMLE = mleCell{i}(:,compOrderMLE)*diag(signs(2,:));
+%         end
+%     elseif i == 3
+%         myImageTrue = diag(trueCell{i}(k,compOrderTrue));
+%         myImageEsti = diag(estiCell{i}(k,compOrderEsti))*diag(signs(1,:));
+%         if MLEflag
+%             myImageMLE = diag(mleCell{i}(k,compOrderMLE))*diag(signs(2,:));
+%         end
+%     elseif i == 6
+%         myImageTrue = trueCell{i}(:,compOrderTrue,k);
+%         myImageEsti = estiCell{i}(:,compOrderEsti,k)*diag(signs(1,:));
+%         if MLEflag
+%             myImageMLE = mleCell{i}(:,compOrderMLE,k)*diag(signs(2,:));
+%         end
+%     end
+%     
+%     axes(ha(i))
+%     displayImageValues(myImageTrue,titleTrueCell{i},colorInterval)
+%     
+%     if i == 3
+%         addValuesToImage(myImageTrue)
+%     end
+%     
+%     axes(ha(i+nCols))
+%     displayImageValues(myImageEsti,titleEstiCell{i},colorInterval)
+%     
+%     if i == 3
+%         addValuesToImage(myImageEsti)
+%     end
+%     
+%     if MLEflag
+%         axes(ha(i+10))
+%         displayImageValues(myImageMLE,titleMLECell{i},colorInterval)
+%         if i == 3
+%             addValuesToImage(myImageMLE)
+%         end
+%     end
+% end
 
 
 end

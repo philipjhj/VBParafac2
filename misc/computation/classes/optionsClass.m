@@ -9,11 +9,36 @@ classdef optionsClass < handle
         maxTime
         
         % qDist options (with default options)
-        estimationP='parafac2svd'; % Method used to approximate E(qP)
+        estimationARD ='max'; % max or avg
+        estimationP ='parafac2svd'; % Method used to approximate E(qP)
         activeParams = {'qP','qF','qC','qA','qSigma','qAlpha'};
+        nActiveComponents = 'threshold'; % hard / threshold
+        
         
         % Utilities options
         matrixProductPrSlab = 'mtimesx'; % mtimesx, mmx, gpu
+        
+        % RNG
+        rngInput = 'shuffle'
+        
+    end
+    
+    
+    methods
+    
+        function set.rngInput(obj,value)
+            if isa(value,'double')
+                obj.rngInput = value;
+            elseif isa(value,'char')
+                if strcmp(value,'shuffle')
+                    obj.rngInput = value;
+                else
+                    obj.rngInput = str2double(value); 
+                end
+            end
+            
+            
+        end
         
     end
 end
