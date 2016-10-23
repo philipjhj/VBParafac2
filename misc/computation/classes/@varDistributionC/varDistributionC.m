@@ -140,6 +140,11 @@ classdef varDistributionC < handle
                 
             end
             
+            if strcmp(obj.opts.estimationARD,'max')
+                obj.qAlpha.MeanLog = 0;
+            end
+            
+            
             obj.computeqXMeanLog
             obj.qPvonmisesEntropy=0;
             % Uncomment to set values to the ground truth
@@ -190,8 +195,10 @@ classdef varDistributionC < handle
             
             % Compute expected log of P dists (first term ELBO)
             value = obj.qXMeanLog+obj.qAMeanLog+obj.qCMeanLog+...
-                obj.qFMeanLog+obj.qPMeanLog+obj.qSigmaMeanLog+...
-                obj.qAlphaMeanLog;
+                obj.qFMeanLog+obj.qPMeanLog+obj.qSigmaMeanLog;
+            if strcmp(obj.opts.estimationARD,'avg')
+                value = value + obj.qAlphaMeanLog;
+            end
         end
         
         % ## Entropy terms
@@ -210,7 +217,10 @@ classdef varDistributionC < handle
             
             % Compute sum of entropies
             value = obj.qAEntropy+obj.qCEntropy+obj.qFEntropy+...
-                obj.qPEntropy+obj.qSigmaEntropy+obj.qAlphaEntropy;
+                obj.qPEntropy+obj.qSigmaEntropy;
+            if strcmp(obj.opts.estimationARD,'avg')
+                value = value + obj.qAlphaEntropy;
+            end
         end
         
         % #################################################################
@@ -245,7 +255,7 @@ classdef varDistributionC < handle
         end
         
         function computeqCMeanLog(obj)
-            if isempty(obj.qAlpha.entropy)
+            if isempty(obj.qAlpha.entropy) && strcmp(obj.opts.estimationARD,'avg')
                 obj.qAlpha.updateStatistics;
             end
             obj.qCMeanLog = 1/2*sum(obj.qAlpha.MeanLog)-1/2*trace(obj.qC.mean*diag(obj.qAlpha.mean)*obj.qC.mean');
@@ -309,7 +319,9 @@ classdef varDistributionC < handle
                     
                     methodStr = strcat('update',obj.opts.activeParams{i});
                     obj.(methodStr);
-                    obj.(obj.opts.activeParams{i}).updateStatistics;
+                    if ~(strcmp(obj.opts.estimationARD,'max') && strcmp(obj.opts.activeParams{i},'qAlpha'))
+                        obj.(obj.opts.activeParams{i}).updateStatistics;
+                    end
                 end
                 
                 
@@ -653,13 +665,22 @@ classdef varDistributionC < handle
         
         % ### Variational Factor Alpha
         function updateqAlpha(obj)
-            
+
+            if strcmp(obj.opts.estimationARD,'avg')
             obj.qAlpha.alpha(:) = obj.pAlpha.alpha+1/2*obj.data.K;
             obj.qAlpha.beta = 1./(1/obj.pAlpha.beta+1/2*sum(obj.eCsquared,1));
             
             if isa(obj.qAlpha.beta,'gpuArray')
                 obj.qAlpha.beta = gather(obj.qAlpha.beta);
             end
+
+            elseif strcmp(obj.opts.estimationARD,'max')
+
+                obj.qAlpha.mean = 1./sum(obj.eCsquared,1); 
+                obj.qAlpha.MeanLog = 0;
+                
+            end
+
         end
         
         % #################################################################
