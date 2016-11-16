@@ -12,7 +12,7 @@ I=50;
 J=50;
 K=10;
 M=4;
-Mesti = 20;
+Mesti = 4;
 
 options.dimensions = [I J K M];
 options.initMethod = 'kiers';
@@ -22,6 +22,16 @@ options.precision = [1e4 1e-12];
 rng(3)
 data = varBayesModelParafac2.generateDataFromModel(options);
 % data = permute(I2,[2 1 3]);
+
+%%
+
+% normalModel = normalParafac2(data.X);
+normalModel = normalParafac2(permute(I1,[2 1 3]));
+
+normalModel.fitParafac2(10)
+
+
+%%
 
 myModel=varBayesModelParafac2(data,Mesti);
 
@@ -61,9 +71,9 @@ myModel.qDist.opts.activeParams = {'qA','qF','qC','qP','qSigma','qAlpha'};
 % myModel.data.iter = myModel.data.iter-1;
 % myModel.restartqDist;
 % myModel.opts.maxTime = 5;
-%%
+%
 tic
-myModel.computeVarDistribution(120000);
+myModel.computeVarDistribution(2000);
 toc
 %myModel.qDist.SNR
 myModel.Parafac2Fit
@@ -82,11 +92,11 @@ myModel.plotELBO([100 myModel.data.iter-1])
 
 
 %%
-for k = 1:1
+for k = 1:4
     
     clf
     myModel.plotSolutionRealMatrixK(k)
-%    pause
+   keyboard
    
 end
 %%
