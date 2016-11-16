@@ -32,15 +32,6 @@ classdef varBayesModelParafac2 < handle
             value = find(diff(nonzeros(obj.ELBO_chain))<0);
         end
         
-        function obj = saveobj(obj)
-            if obj.data.I > 1e4
-                obj.data.X = [];
-                obj.qDist.eAiDFtPtPFDAi = [];
-                %             else
-                %                 obj = obj;
-            end
-        end
-        
         function obj = varBayesModelParafac2(X,M)
             % Summary of constructor
             
@@ -370,7 +361,7 @@ classdef varBayesModelParafac2 < handle
             
         end
         
-        function fit = Parafac2Fit(obj)
+        function [fit,fit_true] = Parafac2Fit(obj)
             
             residual=bsxfun(@minus,obj.data.X,obj.util.matrixProductPrSlab(...
                 obj.qDist.qA.mean,obj.util.matrixProductPrSlab(obj.qDist.eD,...
@@ -385,13 +376,15 @@ classdef varBayesModelParafac2 < handle
             end
             
             fit=(1-sum_res/sum_x)*100;
+            fit_true=(1-sum_res/norm(obj.data.Xtrue(:))^2)*100;
             
         end
         
         
-        function SNR(obj)
-            disp(norm(obj.data.Xtrue(:))^2/norm(obj.data.Etrue(:))^2)
+        function value = SNR(obj)
+            value = norm(obj.data.Xtrue(:))^2/norm(obj.data.Etrue(:))^2;
             disp((sum(1./obj.data.Alphatrue))/(1/obj.data.Sigmatrue(1)))
+            disp(value)
         end
         
     end
@@ -443,7 +436,7 @@ classdef varBayesModelParafac2 < handle
                     score = congruenceScore(C,C);
                     i = i+1;
                 end
-                disp(i)
+                
                 generatedData.Ctrue = 10*C;
                 
                 generatedData.Ptrue = zeros(generatedData.J,generatedData.Mtrue,generatedData.K);

@@ -1,38 +1,43 @@
-load('/media/data/DataAndResults/Thesis/motor_normalized_all_subs.mat')
+%load('/media/data/DataAndResults/Thesis/motor_normalized_all_subs.mat')
+set_wd(2)
+set(0,'DefaultFigureWindowStyle','docked')
+load('/media/data/DataAndResults/Thesis/dataBro/Models and data/Apple data/Int2.mat')
 %%
 
 % warning off MATLAB:nearlySingularMatrix
 
 % myModel=varBayesModelParafac2;
 
-I=20;
-J=I;
-K=6;
-M=3;
-Mesti = 3;
+I=50;
+J=50;
+K=10;
+M=4;
+Mesti = 20;
 
 options.dimensions = [I J K M];
 options.initMethod = 'kiers';
-options.congruence = 0.4;
-options.precision = [1e12 1e-3];
+options.congruence = 0.2;
+options.precision = [1e4 1e-12];
 
 rng(3)
 data = varBayesModelParafac2.generateDataFromModel(options);
-
+% data = permute(I2,[2 1 3]);
 
 myModel=varBayesModelParafac2(data,Mesti);
 
+% size(myModel.data.X)
+%
 % myModel=varBayesModelParafac2(Y,100);
 
 myModel.opts.verbose = 1;
-myModel.opts.debugFlag = 2;
-myModel.opts.estimationP= 'vonmises';
-% myModel.opts.estimationP = 'parafac2svd';
-myModel.opts.estimationARD = 'avg';
+myModel.opts.debugFlag = 0;
+% myModel.opts.estimationP= 'parafac2svd';
+myModel.opts.estimationP = 'vonmises';
+myModel.opts.estimationARD = 'max';
 myModel.opts.matrixProductPrSlab = 'mtimesx';
 myModel.opts.nActiveComponents = 'threshold';
-myModel.opts.showIter = 1;
-myModel.opts.rngInput = 1463436224;%'shuffle';
+myModel.opts.showIter = 50;
+% myModel.opts.rngInput = 1;
 
 % data set; rng(3)
 % seed; 1461191309
@@ -47,7 +52,7 @@ myModel.opts.rngInput = 1463436224;%'shuffle';
 %myModel.qDist.SNR
 % clc
 
-myModel.qDist.opts.activeParams = {'qA','qF','qC','qP','qAlpha','qSigma'};
+myModel.qDist.opts.activeParams = {'qA','qF','qC','qP','qSigma','qAlpha'};
 % myModel.qDist.activeParams_opt = {'qC','qAlpha'};
 
 
@@ -56,8 +61,9 @@ myModel.qDist.opts.activeParams = {'qA','qF','qC','qP','qAlpha','qSigma'};
 % myModel.data.iter = myModel.data.iter-1;
 % myModel.restartqDist;
 % myModel.opts.maxTime = 5;
+%%
 tic
-myModel.computeVarDistribution;
+myModel.computeVarDistribution(120000);
 toc
 %myModel.qDist.SNR
 myModel.Parafac2Fit
@@ -83,7 +89,14 @@ for k = 1:1
 %    pause
    
 end
-
+%%
+figure
+subplot(2,1,1)
+imagesc(myModel.qDist.qC.mean)
+colorbar
+subplot(2,1,2)
+imagesc(1./myModel.qDist.qAlpha.mean) % Lav som procent varians i stedet
+colorbar
 %%
 m=matfile('/media/data/DataAndResults/Thesis/motor_normalized_all_subs.mat');
 mask = m.mask;

@@ -664,9 +664,13 @@ classdef varDistributionC < handle
         
         function compute_eD(obj)
             
+            if obj.data.M > 1
             obj.eD = bsxfun(@mtimes,reshape(obj.qC.mean',1,...
                 obj.data.M,obj.data.K),...
                 repmat(eye(obj.data.M),1,1,obj.data.K));
+            else
+                obj.eD = reshape(obj.qC.mean,1,1,obj.data.K);
+            end
         end
         
         % ## Second or Higher Order
@@ -678,7 +682,12 @@ classdef varDistributionC < handle
             if strcmp(obj.opts.estimationP,'vonmises')
                 obj.ePtP = repmat(eye(obj.data.M),1,1,obj.data.K);
             else
-                obj.ePtP = obj.data.J*squeeze(obj.qP.variance)+repmat(eye(obj.data.M),1,1,obj.data.K);%repmat(eye(obj.data.M),1,1,obj.data.K);
+%                 if obj.data.M > 1
+                    obj.ePtP = obj.data.J*permute(obj.qP.variance,[1 2 4 3])+repmat(eye(obj.data.M),1,1,obj.data.K);%repmat(eye(obj.data.M),1,1,obj.data.K);
+%                 else
+%                     obj.ePtP = obj.data.J*squeeze(obj.qP.variance)+repmat(eye(obj.data.M),1,1,obj.data.K);%repmat(eye(obj.data.M),1,1,obj.data.K);
+%                 end
+                
             end
         end
         
