@@ -19,12 +19,67 @@ close all
 
 
 %%
+myAnalysis = analysisVBParafac2([]);
+
+resultsPath = '/media/data/DataAndResults/Thesis/output/results/';
+
+% testTitle = 'results_RealData_tests';
+testTitle= 'results_ARD_tests';
+% testTitle= 'test_folder';
+
+myAnalysis = myAnalysis.computeTableELBOAll(resultsPath,testTitle);
+
+load gong.mat;
+sound(y)
+
+%%
+
+myAnalysis.find_max_ELBO_lin_idx;
+myAnalysis.find_max_ELBO_sub_idx;
+
+myAnalysis.find_max_ELBO_filenames;
+%%
+myAnalysis.dispBestRuns
+%%
+myAnalysis=myAnalysis.computeTableResultsFull;
+%%
+myAnalysis.computeTableFoundComponents;
 
 
-testDir='/media/data/DataAndResults/Thesis/output/results/results_ARD_tests/';
+imagesc((myAnalysis.nFoundComponents))
+colorbar
+axis image
+yticks(1:36)
 
-myAnalysis.computeTestResults(testDir)
 
+testConfig = sortrows(...
+    unique(myAnalysis.max_ELBO_sub_idx(:,1:3),'rows'),myAnalysis.sortOrder);
+ynames = cell(1,size(testConfig,1));
+
+for i = 1:size(testConfig,1)
+    
+    myString = '';
+    for j = 1:3 
+        myString = sprintf('%s %s',myString,...
+            myAnalysis.testOpts.(myAnalysis.testOpts_names{j}){...
+            testConfig(i,j)});
+    end
+    ynames{i} = myString;
+end
+
+% ynames = unique(cat(1,ynames{:}));
+
+set(gca,'YTickLabel',ynames)
+xlabel('Data Sets')
+%%
+close all
+%%
+myAnalysis.fontsize = 12;
+myAnalysis.plotTableResults
+close all
+%%
+%%
+myAnalysis.plotARDtest
 
 %%
 

@@ -141,7 +141,11 @@ classdef varDistributionC < handle
             end
             
             if strcmp(obj.opts.estimationARD,'max')
-                obj.qAlpha.MeanLog = 0;
+                obj.qAlpha.MeanLog = log(obj.qAlpha.mean);
+            end
+            
+            if strcmp(obj.opts.estimationNoise,'max')
+                obj.qSigma.MeanLog = log(obj.qSigma.mean);
             end
             
             
@@ -195,7 +199,10 @@ classdef varDistributionC < handle
             
             % Compute expected log of P dists (first term ELBO)
             value = obj.qXMeanLog+obj.qAMeanLog+obj.qCMeanLog+...
-                obj.qFMeanLog+obj.qPMeanLog+obj.qSigmaMeanLog;
+                obj.qFMeanLog+obj.qPMeanLog;
+            if strcmp(obj.opts.estimationNoise,'avg')
+                value = value + obj.qSigmaMeanLog;
+            end
             if strcmp(obj.opts.estimationARD,'avg')
                 value = value + obj.qAlphaMeanLog;
             end
@@ -217,7 +224,11 @@ classdef varDistributionC < handle
             
             % Compute sum of entropies
             value = obj.qAEntropy+obj.qCEntropy+obj.qFEntropy+...
-                obj.qPEntropy+obj.qSigmaEntropy;
+                obj.qPEntropy;
+           
+            if strcmp(obj.opts.estimationNoise,'avg')
+                value = value + obj.qSigmaEntropy;
+            end
             if strcmp(obj.opts.estimationARD,'avg')
                 value = value + obj.qAlphaEntropy;
             end
@@ -258,7 +269,9 @@ classdef varDistributionC < handle
             if isempty(obj.qAlpha.entropy) && strcmp(obj.opts.estimationARD,'avg')
                 obj.qAlpha.updateStatistics;
             end
-            obj.qCMeanLog = 1/2*sum(obj.qAlpha.MeanLog)-1/2*trace(obj.qC.mean*diag(obj.qAlpha.mean)*obj.qC.mean');
+            obj.qCMeanLog = 1/2*sum(obj.qAlpha.MeanLog)-1/2*(...%trace(obj.qC.mean*diag(obj.qAlpha.mean)*obj.qC.mean'));
+                 trace(diag(obj.qAlpha.mean)*sum(obj.qC.variance,3))+sum(sum(obj.qC.mean.^2*diag(obj.qAlpha.mean))));
+                
         end
         
         function computeqFMeanLog(obj)
@@ -304,7 +317,9 @@ classdef varDistributionC < handle
                     methodStr = strcat('update',obj.opts.activeParams{i});
                     obj.(methodStr);
                     if ~(strcmp(obj.opts.estimationARD,'max') && strcmp(obj.opts.activeParams{i},'qAlpha'))
-                        obj.(obj.opts.activeParams{i}).updateStatistics;
+                        if ~(strcmp(obj.opts.estimationNoise,'max') && strcmp(obj.opts.activeParams{i},'qSigma'))
+                            obj.(obj.opts.activeParams{i}).updateStatistics;
+                        end
                     end
                 end
                 
@@ -362,7 +377,7 @@ classdef varDistributionC < handle
                     
                     ELBO_new = obj.ELBO;
                     
-                    if (ELBO_new-ELBO_prev)/abs(ELBO_new) < -1e-8 && obj.data.iter > 1
+                    if (ELBO_new-ELBO_prev)/abs(ELBO_new) < -1e-12 && obj.data.iter > 1
                         %                     any_error = 1;
                         %                     if ~first_error
                         %                         first_error = 1;
@@ -373,6 +388,8 @@ classdef varDistributionC < handle
                             'Update problem; ELBO absolute/relative change for %s update is %f \t %d\n',obj.opts.activeParams{i},...
                             ELBO_new-ELBO_prev,(ELBO_new-ELBO_prev)/abs(ELBO_new));
                         warning('on','backtrace')
+                        obj.data.errorIters = [obj.data.errorIters obj.data.iter];
+                        obj.data.errorIters_parameter = [obj.data.errorIters_parameter {obj.opts.activeParams{i}}];
                     end
                     obj.data.ELBOall = [obj.data.ELBOall obj.ELBO];
                 end
@@ -613,25 +630,44 @@ classdef varDistributionC < handle
             end
         end
         
-        % ## (Inverse-)Gamma distributions
+        % ## Gamma distributions
         % ### Variational Factor Sigma
         function updateqSigma(obj)
-            obj.qSigma.alpha(:) = obj.pSigma.alpha+obj.data.I*obj.data.J/2;
             
-            obj.qSigma.beta = 1./(1./obj.pSigma.beta+1/2*sum(obj.eAiDFtPtPFDAi,1)...
-                +1/2*obj.XInnerProduct...
-                -squeeze(sum(sum(...
-                bsxfun(@times,...
-                obj.util.matrixProductPrSlab(obj.qA.mean,...
-                obj.util.matrixProductPrSlab(obj.eD,...
-                obj.util.matrixProductPrSlab(obj.qF.mean',...
-                permute(obj.qP.mean,[2 1 3]))))...
-                ,obj.data.X),1),2))');
             
-            if isa(obj.qSigma.beta,'gpuArray')
-                obj.qSigma.beta = gather(obj.qSigma.beta);
+            if strcmp(obj.opts.estimationNoise,'avg')
+                obj.qSigma.alpha(:) = obj.pSigma.alpha+obj.data.I*obj.data.J/2;
+                
+                obj.qSigma.beta = 1./(1./obj.pSigma.beta+1/2*sum(obj.eAiDFtPtPFDAi,1)...
+                    +1/2*obj.XInnerProduct...
+                    -squeeze(sum(sum(...
+                    bsxfun(@times,...
+                    obj.util.matrixProductPrSlab(obj.qA.mean,...
+                    obj.util.matrixProductPrSlab(obj.eD,...
+                    obj.util.matrixProductPrSlab(obj.qF.mean',...
+                    permute(obj.qP.mean,[2 1 3]))))...
+                    ,obj.data.X),1),2))');
+                
+                if isa(obj.qSigma.beta,'gpuArray')
+                    obj.qSigma.beta = gather(obj.qSigma.beta);
+                end
+                
+            elseif strcmp(obj.opts.estimationNoise,'max')
+                
+                obj.qSigma.mean = 1./(1/(obj.data.J*obj.data.I)*(sum(obj.eAiDFtPtPFDAi,1)+...
+                    obj.XInnerProduct-...
+                    2*squeeze(sum(sum(...
+                    bsxfun(@times,...
+                    obj.util.matrixProductPrSlab(obj.qA.mean,...
+                    obj.util.matrixProductPrSlab(obj.eD,...
+                    obj.util.matrixProductPrSlab(obj.qF.mean',...
+                    permute(obj.qP.mean,[2 1 3]))))...
+                    ,obj.data.X),1),2))'));
+                
+                obj.qSigma.MeanLog = log(obj.qSigma.mean);
+                
+%                 
             end
-            
         end
         
         
@@ -643,17 +679,14 @@ classdef varDistributionC < handle
             obj.qAlpha.alpha(:) = obj.pAlpha.alpha+1/2*obj.data.K;
             obj.qAlpha.beta = 1./(1/obj.pAlpha.beta+1/2*sum(obj.eCsquared,1));
             
-            if isa(obj.qAlpha.beta,'gpuArray')
-                obj.qAlpha.beta = gather(obj.qAlpha.beta);
-            end
-
+            
             elseif strcmp(obj.opts.estimationARD,'max')
 
                 obj.qAlpha.mean = 1./sum(obj.eCsquared,1); 
-                obj.qAlpha.MeanLog = 0;
+                obj.qAlpha.MeanLog = log(obj.qAlpha.mean);
                 
             end
-
+            
         end
         
         % #################################################################
@@ -664,13 +697,9 @@ classdef varDistributionC < handle
         
         function compute_eD(obj)
             
-            if obj.data.M > 1
             obj.eD = bsxfun(@mtimes,reshape(obj.qC.mean',1,...
                 obj.data.M,obj.data.K),...
                 repmat(eye(obj.data.M),1,1,obj.data.K));
-            else
-                obj.eD = reshape(obj.qC.mean,1,1,obj.data.K);
-            end
         end
         
         % ## Second or Higher Order
@@ -682,12 +711,7 @@ classdef varDistributionC < handle
             if strcmp(obj.opts.estimationP,'vonmises')
                 obj.ePtP = repmat(eye(obj.data.M),1,1,obj.data.K);
             else
-%                 if obj.data.M > 1
-                    obj.ePtP = obj.data.J*permute(obj.qP.variance,[1 2 4 3])+repmat(eye(obj.data.M),1,1,obj.data.K);%repmat(eye(obj.data.M),1,1,obj.data.K);
-%                 else
-%                     obj.ePtP = obj.data.J*squeeze(obj.qP.variance)+repmat(eye(obj.data.M),1,1,obj.data.K);%repmat(eye(obj.data.M),1,1,obj.data.K);
-%                 end
-                
+                obj.ePtP = obj.data.J*squeeze(obj.qP.variance)+repmat(eye(obj.data.M),1,1,obj.data.K);%repmat(eye(obj.data.M),1,1,obj.data.K);
             end
         end
         
@@ -728,15 +752,19 @@ classdef varDistributionC < handle
         % #################################################################
         % # Statistics methods
         
-        function nActive = nActiveComponents(obj)
+        function nActive = nActiveComponents(obj,method)
             
-            if strcmp(obj.opts.nActiveComponents,'hard')
+            if nargin<2
+               method = obj.opts.nActiveComponents; 
+            end
+            
+            if strcmp(method,'hard')
                 if isa(obj.qC.mean,'gpuArray')
                     nActive = sum(sum(gather(obj.qC.mean))~=0);
                 else
                     nActive = sum(sum(obj.qC.mean)~=0);
                 end
-            elseif strcmp(obj.opts.nActiveComponents,'threshold')
+            elseif strcmp(method,'threshold')
                 nActive = find(cumsum(sort(1./obj.qAlpha.mean,'descend')/sum(1./obj.qAlpha.mean))>0.95,1);
             end
         end

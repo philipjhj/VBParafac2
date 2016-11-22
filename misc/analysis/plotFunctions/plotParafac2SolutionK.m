@@ -81,25 +81,25 @@ signATrue(sortOrderTrue)
 % end
 
 
-for i = 1:numel(signCTrue)
-%     disp('sign')
-%     disp(signCTrue(sortOrderTrue(i)) ~= signC(sortOrder(i)))
-    disp('A sign')
-    disp(signATrue(sortOrderTrue(i)) ~= signA(sortOrder(i)))
-    if signCTrue(sortOrderTrue(i)) ~= signC(sortOrder(i))
-        
-        C(k,sortOrder(i)) = -1*C(k,sortOrder(i));
-        
-        if signATrue(sortOrderTrue(i)) ~= signA(sortOrder(i))
-            A(:,sortOrder(i)) = -1*A(:,sortOrder(i));
-        else
-            FtPt(sortOrder(i),:) = -1*FtPt(sortOrder(i),:);
-        end
-    elseif signATrue(sortOrderTrue(i)) ~= signA(sortOrder(i))
-            A(:,sortOrder(i)) = -1*A(:,sortOrder(i));
-            FtPt(sortOrder(i),:) = -1*FtPt(sortOrder(i),:);
-    end
-end
+% for i = 1:numel(signCTrue)
+% %     disp('sign')
+% %     disp(signCTrue(sortOrderTrue(i)) ~= signC(sortOrder(i)))
+%     disp('A sign')
+%     disp(signATrue(sortOrderTrue(i)) ~= signA(sortOrder(i)))
+%     if signCTrue(sortOrderTrue(i)) ~= signC(sortOrder(i))
+%         
+%         C(k,sortOrder(i)) = -1*C(k,sortOrder(i));
+%         
+%         if signATrue(sortOrderTrue(i)) ~= signA(sortOrder(i))
+%             A(:,sortOrder(i)) = -1*A(:,sortOrder(i));
+%         else
+%             FtPt(sortOrder(i),:) = -1*FtPt(sortOrder(i),:);
+%         end
+%     elseif signATrue(sortOrderTrue(i)) ~= signA(sortOrder(i))
+%             A(:,sortOrder(i)) = -1*A(:,sortOrder(i));
+%             FtPt(sortOrder(i),:) = -1*FtPt(sortOrder(i),:);
+%     end
+% end
 
 estiCell = {xRecon,A,C,FtPt,F,P};
 trueCell = {X,Atrue,Ctrue,FtPtTrue,Ftrue,Ptrue};

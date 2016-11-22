@@ -10,6 +10,7 @@ classdef optionsClass < handle
         
         % qDist options (with default options)
         estimationARD ='max'; % max or avg
+        estimationNoise ='max'; % max or avg
         estimationP ='parafac2svd'; % Method used to approximate E(qP)
         activeParams = {'qP','qF','qC','qA','qSigma','qAlpha'};
         nActiveComponents = 'threshold'; % hard / threshold

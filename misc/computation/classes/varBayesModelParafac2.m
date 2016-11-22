@@ -5,7 +5,9 @@ classdef varBayesModelParafac2 < handle
         ELBO_chain
         fit_chain
         n_components
+        n_components_hard
         evaltime
+        evaltime_cpu
         % Variational Distribution
         qDist
         
@@ -86,7 +88,9 @@ classdef varBayesModelParafac2 < handle
             obj.ELBO_chain = [];
             obj.fit_chain = [];
             obj.n_components = [];
+            obj.n_components_hard = [];
             obj.evaltime = [];
+            obj.evaltime_cpu = [];
             
         end
         
@@ -122,10 +126,13 @@ classdef varBayesModelParafac2 < handle
                 obj.qDist = obj.qDist.initDist;
                 
                 obj.n_components(1) = obj.qDist.nActiveComponents;
+                obj.n_components_hard(1) = obj.qDist.nActiveComponents('hard');
                 obj.evaltime(1) = 1e-10;
+                obj.evaltime_cpu(1) = 1e-10;
             end
             
             startTime = obj.evaltime(obj.evaltime==max(obj.evaltime));
+            startTime_cpu = obj.evaltime_cpu(obj.evaltime_cpu==max(obj.evaltime_cpu));
             
             % Compute Initial ELBO
             ELBO = obj.qDist.ELBO;
@@ -138,6 +145,7 @@ classdef varBayesModelParafac2 < handle
             
             % Update Variational Factors until ELBO has converged
             ticCAVI=tic;
+            t_CAVI_cpu = cputime;
             while abs(diff)/abs(ELBO) > obj.opts.tol && obj.opts.maxiter+1 > obj.data.iter...
                     && obj.opts.maxTime > obj.evaltime(obj.evaltime==max(obj.evaltime))
                 
@@ -156,12 +164,16 @@ classdef varBayesModelParafac2 < handle
                     obj.ELBO_chain = [obj.ELBO_chain zeros(1,100)];
                     obj.fit_chain = [obj.fit_chain zeros(1,100)];
                     obj.evaltime = [obj.evaltime zeros(1,100)];
+                    obj.evaltime_cpu = [obj.evaltime_cpu zeros(1,100)];
                     obj.n_components = [obj.n_components zeros(1,100)];
+                    obj.n_components_hard = [obj.n_components_hard zeros(1,100)];
                 end
                 obj.ELBO_chain(obj.data.iter) = ELBO;
                 obj.fit_chain(obj.data.iter) = obj.Parafac2Fit;
                 obj.evaltime(obj.data.iter) = toc(ticCAVI)+startTime;
+                obj.evaltime_cpu(obj.data.iter) = cputime-t_CAVI_cpu+startTime_cpu;
                 obj.n_components(obj.data.iter) = obj.qDist.nActiveComponents;
+                obj.n_components_hard(obj.data.iter) = obj.qDist.nActiveComponents('hard');
                 
                 % Check convergence
                 if obj.opts.debugFlag >= 1 && diff/abs(ELBO) < -1e-7 && obj.data.iter>0
@@ -221,13 +233,15 @@ classdef varBayesModelParafac2 < handle
             obj.ELBO_chain = nonzeros(obj.ELBO_chain)';
             obj.fit_chain = nonzeros(obj.fit_chain)';
             obj.evaltime = nonzeros(obj.evaltime)';
+            obj.evaltime_cpu = nonzeros(obj.evaltime_cpu)';
             obj.n_components = nonzeros(obj.n_components)';
+            obj.n_components_hard = nonzeros(obj.n_components_hard)';
         end
         
         
         function displayHeader(obj)
             %'ELBO','ePxz','eQz'
-            names = {'# comps','ELBO Diff','ELBO','Fit'};
+            names = {'# comps','# strict','ELBO Diff','ELBO','Fit'};
                 %'eX','eA','eC','eF','eP','eSigma','eAlpha','hA','hC','hF','hP','hSigma','hAlpha'};
             
             fprintf('%5s','Iter');
@@ -263,7 +277,7 @@ classdef varBayesModelParafac2 < handle
             %             fprintf('eQz: %f \n',obj.qDist.eQz);
             %                   obj.qDist.ELBO,obj.qDist.ePxz,obj.qDist.eQz,...
             ELBO = obj.ELBO_chain(obj.data.iter);
-            fprintf('%10d',obj.n_components(obj.data.iter));
+            fprintf('%10d',obj.n_components(obj.data.iter),obj.n_components_hard(obj.data.iter));
             fprintf('%10.2e',...
                 diff,...
                 ELBO,obj.fit_chain(obj.data.iter));
@@ -273,6 +287,47 @@ classdef varBayesModelParafac2 < handle
 %                 obj.qDist.qFEntropy,obj.qDist.qPEntropy,obj.qDist.qSigmaEntropy,...
 %                 obj.qDist.qAlphaEntropy)
             fprintf('\n')
+            
+        end
+        
+        
+        
+        function obj = compute_reconstruction(obj)
+            
+            obj.data.Xrecon_m = zeros(obj.data.I,obj.data.J,obj.data.K,obj.data.M);
+            
+            A = obj.qDist.qA.mean;
+            D = obj.qDist.eD;
+            F = obj.qDist.qF.mean;
+            P = obj.qDist.qP.mean;
+            
+            for m = 1:obj.data.M
+                obj.data.Xrecon_m(:,:,:,m) = obj.util.matrixProductPrSlab(...
+                    obj.util.matrixProductPrSlab(obj.util.matrixProductPrSlab(...
+                    A(:,m),D(m,m,:)),F(:,m)'),permute(P,[2 1 3]));
+            end
+            
+            obj.data.Xrecon = sum(obj.data.Xrecon_m,4);
+            
+            if ~isempty(obj.data.Xtrue) && isempty(obj.data.Xtrue_m) 
+                
+                obj.data.Xtrue_m = zeros(obj.data.I,obj.data.J,obj.data.K,obj.data.M);
+                
+                A = obj.data.Atrue;
+                D = bsxfun(@mtimes,reshape(obj.data.Ctrue',1,...
+                obj.data.Mtrue,obj.data.K),...
+                repmat(eye(obj.data.Mtrue),1,1,obj.data.K));
+                F = obj.data.Ftrue;
+                P = obj.data.Ptrue;
+                
+                for m = 1:obj.data.Mtrue
+                    obj.data.Xtrue_m(:,:,:,m) = obj.util.matrixProductPrSlab(...
+                        obj.util.matrixProductPrSlab(obj.util.matrixProductPrSlab(...
+                        A(:,m),D(m,m,:)),F(:,m)'),permute(P,[2 1 3]));
+                end
+                
+                
+            end
             
         end
         
@@ -429,15 +484,20 @@ classdef varBayesModelParafac2 < handle
                 
                 generatedData.Ftrue = chol(F);
                 
-                score = 1;
+                score = zeros(M);
+                score(1,2) = 1;
                 i=0;
                 while any(any(nonzeros(score)>0.8))
                     C = rand(K,M);
-                    score = congruenceScore(C,C);
+                    for m1 = 1:M
+                        for m2 = (m1+1):M
+                        score(m1,m2) = congruenceScore(C(:,m1),C(:,m2));
+                        end
+                    end
                     i = i+1;
                 end
                 
-                generatedData.Ctrue = 10*C;
+                generatedData.Ctrue = 30*C;
                 
                 generatedData.Ptrue = zeros(generatedData.J,generatedData.Mtrue,generatedData.K);
                 
@@ -447,10 +507,13 @@ classdef varBayesModelParafac2 < handle
                     
                     generatedData.Ptrue(:,:,k) = orth(mvnrnd(zeros(generatedData.J,generatedData.Mtrue),eye(generatedData.Mtrue)));
                     
+                    generatedData.Etrue(:,:,k) = mvnrnd(zeros(generatedData.I,generatedData.J)...
+                        ,eye(generatedData.J)*1./1);
+                    
                     generatedData.Xtrue(:,:,k) = generatedData.Atrue*diag(generatedData.Ctrue(k,:))*...
                         generatedData.Ftrue'*generatedData.Ptrue(:,:,k)';
                     
-                    generatedData.X(:,:,k) = generatedData.Xtrue(:,:,k);
+                    generatedData.X(:,:,k) = generatedData.Xtrue(:,:,k)+generatedData.Etrue(:,:,k);
                 end
                 
             elseif strcmp(options.initMethod,'generative')
@@ -496,15 +559,3 @@ classdef varBayesModelParafac2 < handle
 end
 
 
-
-function score = congruenceScore(x,y)
-    xy = x'*y;
-    xxsq = sqrt(diag(xy));
-    xxyy = xxsq*xxsq';
-    
-    if numel(xy)>1
-        score = triu(xy./(xxyy),1);
-    else
-        score = xy./(xxyy);
-    end
-end

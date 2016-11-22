@@ -7,6 +7,8 @@ dimArray = zeros(1,3);
 
 for i = 1:4
     
+    testDir = '/media/data/DataAndResults/Thesis/output/results/results_RealData_tests/'
+    
     mydir=strcat('/media/data/DataAndResults/Thesis/data/dataBro/Models and data/',datasets{i},' data/');
     files=dir(mydir);
     %

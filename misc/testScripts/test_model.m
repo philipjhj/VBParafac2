@@ -4,34 +4,37 @@ set(0,'DefaultFigureWindowStyle','docked')
 load('/media/data/DataAndResults/Thesis/dataBro/Models and data/Apple data/Int2.mat')
 %%
 
-% warning off MATLAB:nearlySingularMatrix
+warning off MATLAB:nearlySingularMatrix
 
 % myModel=varBayesModelParafac2;
 
-I=50;
-J=50;
-K=10;
-M=4;
-Mesti = 4;
+I=20;
+J=20;
+K=4;
+M=2;
+Mesti = 7;
 
 options.dimensions = [I J K M];
 options.initMethod = 'kiers';
-options.congruence = 0.2;
-options.precision = [1e4 1e-12];
+% options.initMethod = 'generative';
+options.congruence = 0.4;
+% 1e4 1e-3 i ARD tests
+options.precision = [1e2 1e-6]; 
+% [1e4 1e-8] creates problems for qC
 
 rng(3)
 data = varBayesModelParafac2.generateDataFromModel(options);
 % data = permute(I2,[2 1 3]);
 
-%%
+%
 
 % normalModel = normalParafac2(data.X);
-normalModel = normalParafac2(permute(I1,[2 1 3]));
+% normalModel = normalParafac2(permute(I1,[2 1 3]));
 
-normalModel.fitParafac2(10)
+% normalModel.fitParafac2(10)
 
 
-%%
+
 
 myModel=varBayesModelParafac2(data,Mesti);
 
@@ -40,13 +43,14 @@ myModel=varBayesModelParafac2(data,Mesti);
 % myModel=varBayesModelParafac2(Y,100);
 
 myModel.opts.verbose = 1;
-myModel.opts.debugFlag = 0;
-% myModel.opts.estimationP= 'parafac2svd';
-myModel.opts.estimationP = 'vonmises';
-myModel.opts.estimationARD = 'max';
+myModel.opts.debugFlag = 2;
+myModel.opts.estimationP= 'parafac2svd';
+% myModel.opts.estimationP = 'vonmises';
+myModel.opts.estimationARD = 'avg';
+myModel.opts.estimationNoise = 'max';
 myModel.opts.matrixProductPrSlab = 'mtimesx';
 myModel.opts.nActiveComponents = 'threshold';
-myModel.opts.showIter = 50;
+myModel.opts.showIter = 1;
 % myModel.opts.rngInput = 1;
 
 % data set; rng(3)
@@ -62,18 +66,21 @@ myModel.opts.showIter = 50;
 %myModel.qDist.SNR
 % clc
 
-myModel.qDist.opts.activeParams = {'qA','qF','qC','qP','qSigma','qAlpha'};
+% myModel.qDist.opts.activeParams = {'qC','qAlpha','qSigma'};
+% myModel.qDist.opts.activeParams = {'qA','qF','qP','qC','qAlpha'};
+myModel.qDist.opts.activeParams = {'qA','qC','qP','qSigma','qF','qAlpha'};
+% myModel.qDist.opts.activeParams = {'qA','qF','qP','qC','qAlpha','qSigma'};
 % myModel.qDist.activeParams_opt = {'qC','qAlpha'};
 
 
 % clc
-
+%
 % myModel.data.iter = myModel.data.iter-1;
 % myModel.restartqDist;
 % myModel.opts.maxTime = 5;
 %
 tic
-myModel.computeVarDistribution(2000);
+myModel.computeVarDistribution;
 toc
 %myModel.qDist.SNR
 myModel.Parafac2Fit

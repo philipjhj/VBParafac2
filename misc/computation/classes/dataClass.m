@@ -5,7 +5,8 @@ classdef dataClass < handle
         M
         
         % True latent variables (if generated)
-        Xtrue = []
+        Xtrue = [] %without noise, X above contains noise
+        Xtrue_m = [] % X split into components
         Atrue = []
         Ctrue = []
         Ftrue = []
@@ -21,6 +22,14 @@ classdef dataClass < handle
         
         iter
         ELBOall
+        
+        errorIters = []
+        errorIters_parameter = {};
+        
+        % Reconstruction
+        Xrecon
+        Xrecon_m
+        
     end
     
     properties
