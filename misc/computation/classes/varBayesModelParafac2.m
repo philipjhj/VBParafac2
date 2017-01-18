@@ -1,6 +1,5 @@
 classdef varBayesModelParafac2 < handle
     
-    
     properties
         ELBO_chain
         fit_chain
@@ -386,20 +385,22 @@ classdef varBayesModelParafac2 < handle
             obj.fit_chain = nonzeros(obj.fit_chain)';
             obj.evaltime = nonzeros(obj.evaltime)';
             obj.n_components = nonzeros(obj.n_components)';
+            obj.n_components_hard = nonzeros(obj.n_components_hard)';
             
             
             subplot(3,1,1)
             semilogy(nonzeros(obj.ELBO_chain))
+            
             title('ELBO')
             subplot(3,1,2)
             semilogy(plotinterval(1):(plotinterval(2)-1),diff(nonzeros(obj.ELBO_chain(plotinterval(1):plotinterval(2)))))
             xlim([0 obj.data.iter])
             title('ELBO difference between iterations')
             subplot(3,1,3)
-            plot(obj.n_components)
+            plot(obj.n_components_hard)
             if ~isempty(obj.data.Mtrue)
                 hold on
-                plot([0 numel(obj.n_components)],[obj.data.Mtrue obj.data.Mtrue],'r','LineWidth',2)
+                plot([0 numel(obj.n_components_hard)],[obj.data.Mtrue obj.data.Mtrue],'r--','LineWidth',2)
                 hold off
                 axis tight
             end
@@ -426,8 +427,8 @@ classdef varBayesModelParafac2 < handle
             sum_res = 0;
             sum_x = 0;
             for k = 1:obj.data.K
-                sum_res = sum_res+norm(residual(:,:,k))^2;
-                sum_x = sum_x + norm(obj.data.X(:,:,k))^2;
+                sum_res = sum_res+norm(residual(:,:,k),'fro')^2;
+                sum_x = sum_x + norm(obj.data.X(:,:,k),'fro')^2;
             end
             
             fit=(1-sum_res/sum_x)*100;
@@ -502,19 +503,45 @@ classdef varBayesModelParafac2 < handle
                 generatedData.Ptrue = zeros(generatedData.J,generatedData.Mtrue,generatedData.K);
                 
                 generatedData.Etrue = zeros(I,J,K);
+
+                
+                
+                
+                
+                
                 
                 for k = 1:generatedData.K
                     
                     generatedData.Ptrue(:,:,k) = orth(mvnrnd(zeros(generatedData.J,generatedData.Mtrue),eye(generatedData.Mtrue)));
                     
-                    generatedData.Etrue(:,:,k) = mvnrnd(zeros(generatedData.I,generatedData.J)...
-                        ,eye(generatedData.J)*1./1);
+                    
                     
                     generatedData.Xtrue(:,:,k) = generatedData.Atrue*diag(generatedData.Ctrue(k,:))*...
                         generatedData.Ftrue'*generatedData.Ptrue(:,:,k)';
                     
-                    generatedData.X(:,:,k) = generatedData.Xtrue(:,:,k)+generatedData.Etrue(:,:,k);
+                    
                 end
+                
+%                 SNR = linspace(-4,0,generatedData.K);
+                SNR = [repmat(-20,1,5) zeros(1,generatedData.K-5)];
+                
+                
+                ssq = generatedData.computeNoiseLevel(generatedData,SNR);
+                
+                generatedData.Sigmatrue = ssq;
+                
+                for k = 1:generatedData.K
+                
+%                     generatedData.Etrue(:,:,k) = mvnrnd(zeros(generatedData.I,generatedData.J)...
+%                         ,eye(generatedData.J)*ssq);%(k));
+% 
+                      generatedData.Etrue(:,:,k) = mvnrnd(zeros(generatedData.I,generatedData.J)...
+                        ,eye(generatedData.J)*ssq(k));
+
+                end
+                
+                
+                generatedData.X = generatedData.Xtrue+generatedData.Etrue;
                 
             elseif strcmp(options.initMethod,'generative')
                 

@@ -75,13 +75,14 @@ for k = 1:K
         
         for cinf = 1:nConfIntervals
             
-            if sum(sum(confintervals(i,:,cinf:cinf+1))) > 100*J*K
+%             if sum(sum(confintervals(i,:,cinf:cinf+1))) > 100*J*K
                 xFill = [1:J fliplr(1:J)];
                 zFill = [confintervals(i,:,cinf) fliplr(confintervals(i,:,cinf+1))];
                 %         keyboard
                 fill3(xFill,repmat(i,1,2*J),zFill,myColors(mod(i-1,nColors)+1,:),...
                     'facealpha',alphaValues(cinf),'LineWidth',2,'EdgeColor',myColors(mod(i-1,nColors)+1,:))
-            end
+%                 keyboard
+%             end
         end
     end
 end

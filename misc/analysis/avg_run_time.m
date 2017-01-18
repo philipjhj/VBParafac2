@@ -1,21 +1,37 @@
 
 
 
-% testDir = '/media/data/DataAndResults/Thesis/output/results/results_RealData_tests/';
-testDir = '/media/data/DataAndResults/Thesis/output/results/ARD_tests/';
+testDir = '/media/data/DataAndResults/Thesis/output/results/results_RealData_tests3/';
+% testDir = '/media/data/DataAndResults/Thesis/output/results/results_ARD_final/';
 files=dir(testDir);
 
 evaltime = [];
 
+not_converged = [];
+
 for file = files'
-    if regexp(file.name, regexptranslate('wildcard','Int*'))
+%     if regexp(file.name, regexptranslate('wildcard','Int*'))
+    if regexp(file.name,'.*__.*')
+
         %             disp(file.name)
         load(strcat(file.folder,'/',file.name))
        
         evaltime = [evaltime myModel.evaltime(end)];
         
+        not_converged = [not_converged 1e-7<((myModel.ELBO_chain(end)-myModel.ELBO_chain(end-1))/myModel.ELBO_chain(end))];
+        
+        
     end
 end
+%%
+
+mean(evaltime)/60/60
+sum(not_converged)
+
+%%
+
+
+plot(evaltime/60/60)
 
 
 %%

@@ -269,7 +269,7 @@ classdef varDistributionC < handle
             if isempty(obj.qAlpha.entropy) && strcmp(obj.opts.estimationARD,'avg')
                 obj.qAlpha.updateStatistics;
             end
-            obj.qCMeanLog = 1/2*sum(obj.qAlpha.MeanLog)-1/2*(...%trace(obj.qC.mean*diag(obj.qAlpha.mean)*obj.qC.mean'));
+            obj.qCMeanLog = obj.data.K/2*sum(obj.qAlpha.MeanLog)-1/2*(...%trace(obj.qC.mean*diag(obj.qAlpha.mean)*obj.qC.mean'));
                  trace(diag(obj.qAlpha.mean)*sum(obj.qC.variance,3))+sum(sum(obj.qC.mean.^2*diag(obj.qAlpha.mean))));
                 
         end
@@ -682,7 +682,7 @@ classdef varDistributionC < handle
             
             elseif strcmp(obj.opts.estimationARD,'max')
 
-                obj.qAlpha.mean = 1./sum(obj.eCsquared,1); 
+                obj.qAlpha.mean = obj.data.K./sum(obj.eCsquared,1); 
                 obj.qAlpha.MeanLog = log(obj.qAlpha.mean);
                 
             end

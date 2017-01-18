@@ -31,6 +31,11 @@ classdef analysisVBParafac2 < handle
         max_ELBO_filenames
         max_ELBO_filenames_failed
         
+        % idx for test parameters and their columns in sub_idx
+        % excluding data_names, datasetRNG, initRNG
+        testConfig
+        testConfig_columns
+        
         
         % Information about loaded tests
         testOpts % Struct of options and possible values
@@ -43,12 +48,19 @@ classdef analysisVBParafac2 < handle
         data_names
         data_count
         
+        n_uniq_parameters = 1;
+        
         % Results
-        sortOrder = [2 1 3];
+        selected_rows
+        sortOrder
         
         AllResults
         nFoundComponents_low_threshold
         nFoundComponents_high_threshold
+        nActiveComponents
+        nActiveComponents_hard
+        fit_table
+        ELBO_diff
         
         % Plot settings
         fontsize = 15;
@@ -135,7 +147,7 @@ classdef analysisVBParafac2 < handle
                 
                 data_names = cell(1,obj.nFiles);
                 for file_i = 1:obj.nFiles
-                    if regexp(files{file_i},'.*\.mat')
+                    if regexp(files{file_i},'.*__.*\.mat')
                         
                         fullname = regexp(files{file_i},'(.*)__(.*)','tokens');
                         
@@ -198,7 +210,7 @@ classdef analysisVBParafac2 < handle
                 file_j = 1;
                 for file_i = 1:obj.nFiles
                     
-                    if regexp(files{file_i},'.*\.mat')
+                    if regexp(files{file_i},'.*__.*\.mat')
                         load(strcat(obj.test_dir,files{file_i}));
                         
                         if obj.data_count ~= 1
@@ -221,18 +233,25 @@ classdef analysisVBParafac2 < handle
                         fitarray(LinIdx([obj.data_count 2 dims_opts],[data_idx 2 Opt_idx])) = fit_true;
                         
                         idx_linear = LinIdx([obj.data_count dims_opts],[data_idx Opt_idx]);
+%                         
+%                         disp(Opt_idx)
                         
+%                         disp(idx_linear)
                         countarray(idx_linear) = countarray(idx_linear)+1;
                         ELBOarray(idx_linear) = myModel.ELBO_chain(myModel.data.iter-1);
+%                         disp(myModel.ELBO_chain(myModel.data.iter-1))
+                        
                         
                         file_j=file_j+1; % Only increment this if file is approved
                     end
                     
                 end
                 
-                obj.fitArray = squeeze(fitarray);
-                obj.countArray = squeeze(countarray);
-                obj.ELBOArray = squeeze(ELBOarray);
+                disp(file_j)
+                
+                obj.fitArray = fitarray;
+                obj.countArray = countarray;
+                obj.ELBOArray = ELBOarray;
                 obj.testOpts = optUniq;
                 obj.testOpts_names = fields(obj.testOpts);
                 obj.testOpts_count = numel(obj.testOpts_names);
@@ -280,9 +299,9 @@ classdef analysisVBParafac2 < handle
             [myIdx{:}]=ind2sub(sizeELBOarray,obj.max_ELBO_lin_idx);
             [myIdx_failed{:}]=ind2sub(sizeELBOarray(1:end-1),obj.max_ELBO_lin_idx_failed);
             
-            obj.max_ELBO_sub_idx = sortrows(cat(2,myIdx{:}),[obj.sortOrder 4:nDimELBOarray]);
+            obj.max_ELBO_sub_idx = sortrows(cat(2,myIdx{:}),[obj.sortOrder (obj.n_uniq_parameters+1):nDimELBOarray]);
             obj.max_ELBO_sub_idx_failed = sortrows(cat(2,myIdx_failed{:}),...
-                [obj.sortOrder 4:nDimELBOarray-1]);
+                [obj.sortOrder (obj.n_uniq_parameters+1):nDimELBOarray-1]);
             
         end
         
@@ -310,11 +329,12 @@ classdef analysisVBParafac2 < handle
                         myString = strcat(myString,'_',obj.testOpts_names{j},...
                             '_',obj.testOpts.(obj.testOpts_names{j})(...
                             obj.max_ELBO_sub_idx(i,k)));
-                        k = k+1;
+                        
                     else
                         myString = strcat(myString,'_',obj.testOpts_names{j},...
                             '_',obj.testOpts.(obj.testOpts_names{j})(1));
                     end
+                    k = k+1;
                 end
                 
 %                 disp(myString)
@@ -360,10 +380,14 @@ classdef analysisVBParafac2 < handle
                     load(strcat(obj.test_dir,obj.max_ELBO_filenames{i}))
                     
                     %
-                    myModel.compute_reconstruction;
+                    
                     
                     obj.AllResults{i}.ELBO = myModel.ELBO_chain(end);
+                    obj.AllResults{i}.ELBO_last_diff = (myModel.ELBO_chain(end)-myModel.ELBO_chain(end-1))/myModel.ELBO_chain(end);                    
                     obj.AllResults{i}.fit = myModel.Parafac2Fit;
+                    
+                    obj.AllResults{i}.n_active_components = myModel.n_components(end);
+                    obj.AllResults{i}.n_active_components_hard = myModel.n_components_hard(end);
                     
                     
                     
@@ -375,12 +399,49 @@ classdef analysisVBParafac2 < handle
                     %
                     %
                     
+                    myModel.compute_reconstruction;
                     
                     Xrecon_m_full = myModel.data.Xrecon_m;
-                    Xtrue_m_full = myModel.data.Xtrue_m;
+                    
                     
                     mEsti = myModel.data.M;
-                    mTrue = myModel.data.Mtrue;
+                    
+                    
+                    if ~strcmp(obj.max_ELBO_filenames{i}(1:3),'ARD')
+                        
+                        true_path = strcat(obj.results_path,'results_realData_final_normalParafac2_true/');
+                        true_files = dir(true_path);
+                        %                        Load true and compute reconstructions
+                        
+                        data_n = obj.max_ELBO_sub_idx(i,1);
+                        data_prefix = obj.data_names{data_n};
+                        
+                        find_true = regexp({true_files.name},strcat(data_prefix,'__.*'),'match');
+                        if isempty(find(~cellfun(@isempty,find_true)))
+                            continue
+                        else
+                            file_true = find_true{find(~cellfun(@isempty,find_true))}{1};
+                        end
+%                     end
+%                     if isempty(file_true)
+%                         continue
+%                     end
+                        
+                        load(strcat(true_path,file_true))
+                        
+                        
+                        myModel.compute_reconstruction;
+                        
+                        Xtrue_m_full = myModel.Xrecon_m;
+                        mTrue = size(Xtrue_m_full,4);
+                        
+                    else
+                        Xtrue_m_full = myModel.data.Xtrue_m;
+                        mTrue = myModel.data.Mtrue;
+                    end
+                    
+                    
+                    
                     
                     
                     obj.AllResults{i}.congruenceCompare = zeros(mEsti,mTrue);
@@ -417,37 +478,91 @@ classdef analysisVBParafac2 < handle
                     
                     
                 end
-                save(ResultsFile_name,'obj');
+%                 save(ResultsFile_name,'obj');
             
             end
             
         end
         
         function obj = computeTableFoundComponents(obj)
-        
-            obj.testOpts_dims = max(obj.max_ELBO_sub_idx(:,1:3));
-            unique_sub_idx = sortrows(unique(obj.max_ELBO_sub_idx(:,1:3),'rows'),obj.sortOrder);
             
-            nFoundComponents_temp1 = -1*ones(prod(obj.testOpts_dims),10);
-            nFoundComponents_temp2 = -1*ones(prod(obj.testOpts_dims),10);
+            obj.find_max_ELBO_lin_idx;
+            obj.find_max_ELBO_sub_idx;
+            
+            obj.find_max_ELBO_filenames;
+            
+            if ismember('datasetRNG',obj.testOpts_names)
+                all_idx = 2:obj.testOpts_count-1; % testOpts_count all but data_names
+            else
+                all_idx = 2:obj.testOpts_count;
+            end
+            
+            obj.testOpts_dims = max(obj.max_ELBO_sub_idx(:,all_idx));
+            
+            obj.testConfig_columns = all_idx(obj.testOpts_dims>1);
+            
+            if isempty(obj.testConfig_columns)
+                obj.testConfig_columns = all_idx;
+            end
+            
+            obj.testConfig = sortrows(unique(obj.max_ELBO_sub_idx(:,obj.testConfig_columns),'rows'),obj.sortOrder);
+            
+            
+            nDataSets=obj.data_count;
+            
+            nFoundComponents_temp1 = 0*ones(prod(obj.testOpts_dims),nDataSets);
+            nFoundComponents_temp2 = 0*ones(prod(obj.testOpts_dims),nDataSets);
+            
+            nActiveComponents_temp = 0*ones(prod(obj.testOpts_dims),nDataSets);
+            nActiveComponents_hard_temp = 0*ones(prod(obj.testOpts_dims),nDataSets);
+            
+            fit_temp = 0*ones(prod(obj.testOpts_dims),nDataSets);
+            ELBO_diff_temp = 0*ones(prod(obj.testOpts_dims),nDataSets);
+            countarray = zeros(prod(obj.testOpts_dims),nDataSets);
+            
             
             for i = 1:obj.models_count
                 
+                if isfield(obj.AllResults{i},'congruenceCompare')
+                
+%                 if ismember('dataRNG',obj.testOpts_names)
+%                     sets_pr_DataConfig = max(obj.max_ELBO_sub_idx(:,obj.testOpts_count));
+%                 else
+%                     sets_pr_DataConfig = 1;
+%                 end
+                
+                
 %                 rowIdx = LinIdx(obj.testOpts_dims,obj.max_ELBO_sub_idx(i,1:3));
-                rowIdx = ismember(unique_sub_idx,obj.max_ELBO_sub_idx(i,1:3),'rows');
-                colIdx = obj.max_ELBO_sub_idx(i,4);
+                rowIdx = ismember(obj.testConfig,obj.max_ELBO_sub_idx(i,obj.testConfig_columns),'rows');
+%                 colIdx = obj.max_ELBO_sub_idx(i,obj.testOpts_count);
+                colIdx = obj.max_ELBO_sub_idx(i,1);
+
+%                 mTrue=size(obj.AllResults{i}.congruenceCompare,2);
                 
-                mTrue=size(obj.AllResults{i}.congruenceCompare,2);
+                nFoundComponents_temp1(rowIdx,colIdx) = nFoundComponents_temp1(rowIdx,colIdx)+sum(sum(obj.AllResults{i}.congruenceCompare>=0.85));
+                nFoundComponents_temp2(rowIdx,colIdx) = nFoundComponents_temp2(rowIdx,colIdx)+sum(sum(obj.AllResults{i}.congruenceCompare>=0.95));
                 
-                nFoundComponents_temp1(rowIdx,colIdx) = sum(sum(obj.AllResults{i}.congruenceCompare>=0.85));
-                nFoundComponents_temp2(rowIdx,colIdx) = sum(sum(obj.AllResults{i}.congruenceCompare>=0.95));
+                nActiveComponents_temp(rowIdx,colIdx) = nActiveComponents_temp(rowIdx,colIdx)+obj.AllResults{i}.n_active_components;
+                nActiveComponents_hard_temp(rowIdx,colIdx) = nActiveComponents_hard_temp(rowIdx,colIdx)+obj.AllResults{i}.n_active_components_hard;
                 
+                fit_temp(rowIdx,colIdx) = fit_temp(rowIdx,colIdx)+obj.AllResults{i}.fit;
+                ELBO_diff_temp(rowIdx,colIdx) = ELBO_diff_temp(rowIdx,colIdx)+obj.AllResults{i}.ELBO_last_diff;
+                
+                % Sets generated pr. data config (or 1 if real data)
+                countarray(rowIdx,colIdx) = countarray(rowIdx,colIdx) + 1;
+                end
             end
 %             
 
 
-            obj.nFoundComponents_low_threshold = nFoundComponents_temp1;
-            obj.nFoundComponents_high_threshold = nFoundComponents_temp2;
+            obj.nFoundComponents_low_threshold = nFoundComponents_temp1./countarray;
+            obj.nFoundComponents_high_threshold = nFoundComponents_temp2./countarray;
+            
+            obj.nActiveComponents = nActiveComponents_temp./countarray;
+            obj.nActiveComponents_hard = nActiveComponents_hard_temp./countarray;
+            
+            obj.fit_table = fit_temp./countarray;
+            obj.ELBO_diff = ELBO_diff_temp./countarray;
             
         end
         
@@ -470,7 +585,7 @@ classdef analysisVBParafac2 < handle
             end
             
             % I x J x K x M
-            obj.dims = [size(obj.X) size(A,2)];
+            obj.dims = [size(obj.X) size(obj.A,2)];
             
         end
         
@@ -530,14 +645,17 @@ classdef analysisVBParafac2 < handle
                     if isfield(labels,'xnames')
                         set(gca,'TickLabelInterpreter','latex')
                         set(gca,'XTickLabel',labels.xnames)
+                        set(gca,'XTickLabelRotation',-45)
                     end
                     
                     if isfield(labels,'plottitle')
                         title(labels.plottitle,'interpreter','latex')
                     end
-                    
-                    
-                    set(gcf,'Position',[0 0 700 1240]);
+%                     grayMap = gray;
+%                     colormap(lines)
+%                     colormap(gray)
+%                     set(gcf,'Position',[0 0 .8*1940 .8*700])
+                    set(gcf,'Position',[0 0 0.5*1240 940/1240*0.5*940]);
                     set(gca,'tickdir','out');
                     set(gca,'fontsize',obj.fontsize);
 %                     colormap(gca,(copper));
@@ -548,57 +666,166 @@ classdef analysisVBParafac2 < handle
         end
         
         
-        function plotTableResults(obj,type)
+        function plotTableResults(obj,normalParafac2row)
             
             
-            if nargin<2
-                type = 'congruence';
-            end
+            type = 'congruence';
             
             if strcmp(type,'congruence')
                 obj.computeTableFoundComponents;
                 table{1} = obj.nFoundComponents_low_threshold;
                 table{2} = obj.nFoundComponents_high_threshold;
-                savenames = {'_low_thres','_high_thres'};
+                table{3} = obj.nActiveComponents;
+                table{4} = obj.nActiveComponents_hard;
+                table{5} = obj.fit_table;
+                savenames = {'_low_thres','_high_thres','_n_active','_n_active_hard','_fit_table'};
             end
             
+            
+            ynames = cell(1,size(obj.testConfig,1));
+            %                 xnames = obj.data_names;
+            
+            for i = 1:size(obj.testConfig,1)
+                
+                myString = '';
+                for j = 1:size(obj.testConfig,1)-1 %size(,1) for parafac2, size(,2) for VBparafac2
+                    myString = sprintf('%s %s',myString,...
+                        obj.testOpts.(obj.testOpts_names{obj.testConfig_columns(j)-1}){...
+                        obj.testConfig(i,j)});
+                end
+                ynames{i} = myString;
+            end
+            
+%             selected_rows = [1:2 4:5]; % ARD tests
+%             selected_rows = [1]; % Real data
             for t = 1:numel(table)
                 %Plot - Tests x Data
-                imagesc(table{t})
+                myImage=table{t}(obj.selected_rows,:);
+                
+                % Combining normal parafac2 with VB results
+                if nargin > 1 
+                    if all(t~= [3 4])
+                        myImage = [myImage; normalParafac2row{t}];
+                        ynames_final = ynames;
+                        ynames_final{size(obj.testConfig,1)+1} = 'Direct Fitting';
+                    end
+                else
+                    ynames_final = ynames;
+                end
+                
+                imagesc(myImage)%,'Ydata',[1 size(myImage,1)*2])
                 colorbar
-                axis image
-                yticks(1:size(table{t},1))
+                axis square
+%                 yticks(1:size(table{t},1))
+                yticks(1:size(myImage,1));
                 xticks(1:size(table{t},2))
                 
                 % Make labels for tests
-                testConfig = sortrows(...
-                    unique(obj.max_ELBO_sub_idx(:,1:3),'rows'),obj.sortOrder);
-                ynames = cell(1,size(testConfig,1));
+%                 testConfig = sortrows(...
+%                     unique(obj.max_ELBO_sub_idx(:,1:obj.n_uniq_parameters),'rows'),obj.sortOrder);
                 
-                for i = 1:size(testConfig,1)
-                    
-                    myString = '';
-                    for j = 1:3
-                        myString = sprintf('%s %s',myString,...
-                            obj.testOpts.(obj.testOpts_names{j}){...
-                            testConfig(i,j)});
-                    end
-                    ynames{i} = myString;
-                end
+                
                 
                 % ynames = unique(cat(1,ynames{:}));
                 
                 labels.plottitle = ' ';
-                labels.xtitle = 'Data sets';
-                labels.ynames = ynames;
+                labels.xtitle = 'Data set';
+                labels.ynames = ynames_final; %(obj.selected_rows);
+%                 labels.xnames = xnames;
                 
                 obj.formatPlot('TableOfResults',labels)
                 
                 plotnamedir = strcat(obj.test_title,'_result_table_',type);
-                plotnamefile = strcat(plotnamedir,type,savenames{t});
+                plotnamefile = strcat(plotnamedir,savenames{t});
+                
+%                 addValuesToImage(table{t}(selected_rows,:))
+                
                 obj.saveFig(plotnamedir,plotnamefile)
+                
+                datatable.data = myImage;
+                datatable.rownames = get(gca,'YTickLabels');
+                datatable.rownames = datatable.rownames(1:size(myImage,1));
+                datatable.colnames = get(gca,'XTickLabels');
+                
+                
+                obj.saveTable(datatable,plotnamedir,plotnamefile)
+                
             end
         end
+        
+        function saveTable(obj,datatable,outdir,tablename)
+            
+            
+            exportPath = strcat(obj.root_figures,outdir,'/');
+            exportName = strcat(exportPath,tablename,'_table.tex');
+            
+            input.data = datatable.data;
+            
+            % Optional fields:
+            
+            % Set column labels (use empty string for no label):
+            input.tableColLabels = datatable.colnames;
+            % Set row labels (use empty string for no label):
+            input.tableRowLabels = datatable.rownames;
+            
+            % Switch transposing/pivoting your table:
+            input.transposeTable = 0;
+            
+            % Determine whether input.dataFormat is applied column or row based:
+            input.dataFormatMode = 'column'; % use 'column' or 'row'. if not set 'colum' is used
+            
+            % Formatting-string to set the precision of the table values:
+            % For using different formats in different rows use a cell array like
+            % {myFormatString1,numberOfValues1,myFormatString2,numberOfValues2, ... }
+            % where myFormatString_ are formatting-strings and numberOfValues_ are the
+            % number of table columns or rows that the preceding formatting-string applies.
+            % Please make sure the sum of numberOfValues_ matches the number of columns or
+            % rows in input.tableData!
+            %
+            input.dataFormat = {'%.2f',numel(datatable.colnames)};%,'%.1f',1}; % three digits precision for first two columns, one digit for the last
+            
+            % Define how NaN values in input.tableData should be printed in the LaTex table:
+            input.dataNanString = '-';
+            
+            % Column alignment in Latex table ('l'=left-justified, 'c'=centered,'r'=right-justified):
+            input.tableColumnAlignment = 'c';
+            
+            % Switch table borders on/off (borders are enabled by default):
+            input.tableBorders = 0;
+            
+            % Uses booktabs basic formating rules ('1' = using booktabs, '0' = not using booktabs).
+            % Note that this option requires the booktabs package being available in your LaTex.
+            % Also, setting the booktabs option to '1' overwrites input.tableBorders if it exists.
+            input.booktabs = 1;
+            
+            
+            % LaTex table caption:
+            input.tableCaption = 'MyTableCaption';
+            
+            % LaTex table label:
+            input.tableLabel = 'MyTableLabel';
+            
+            % Switch to generate a complete LaTex document or just a table:
+            input.makeCompleteLatexDocument = 0;
+            
+            % call latexTable:
+            latex = latexTable(input);
+            
+            % myDir=
+            
+            % save LaTex code as file
+            fid=fopen(exportName,'w');
+            [nrows,ncols] = size(latex);
+            for row = 1:nrows
+                fprintf(fid,'%s\n',latex{row,:});
+            end
+            fclose(fid);
+            fprintf('\n... your LaTex code has been saved as ''MyLatex.tex'' in your working directory\n');
+            
+            
+            
+        end
+        
         
         function plotARDtest(obj)
             
@@ -670,13 +897,13 @@ classdef analysisVBParafac2 < handle
             
             obj.loadParafac2(Parafac2obj);
             
-            I=dims(1);
-            J=dims(2);
-            K=dims(3);
-            M=dims(4);
+            I=obj.dims(1);
+            J=obj.dims(2);
+            K=obj.dims(3);
+            M=obj.dims(4);
             
-            Xmin = min(min(X,[],3),[],1);
-            Xmax = max(max(X,[],3),[],1);
+            Xmin = min(min(obj.X,[],3),[],1);
+            Xmax = max(max(obj.X,[],3),[],1);
             Xidx = 1:numel(Xmin);
             
             % Plotting
@@ -697,7 +924,8 @@ classdef analysisVBParafac2 < handle
             
             % Saving
             if saveFlag
-                obj.saveFig(plt,plotname,'dataProfile');
+                
+                obj.saveFig(plotname,'dataProfile');
             end
             
             for m = 1:M
@@ -705,7 +933,7 @@ classdef analysisVBParafac2 < handle
                 figure
                 reconM = zeros(I,J,K);
                 for k = 1:K
-                    reconM(:,:,k) = A(:,m)*C(k,m)*F(:,m)'*P(:,:,k)';
+                    reconM(:,:,k) = obj.A(:,m)*obj.C(k,m)*obj.F(:,m)'*obj.P(:,:,k)';
                 end
                 reconMmin = min(min(reconM,[],3),[],1);
                 reconMmax = max(max(reconM,[],3),[],1);
@@ -721,7 +949,7 @@ classdef analysisVBParafac2 < handle
                 
                 title(['Component ',num2str(m)])
                 if saveFlag
-                    obj.saveFig(plt,plotname,['Component ',num2str(m)]);
+                    obj.saveFig(plotname,['Component ',num2str(m)]);
                 end
             end
             
