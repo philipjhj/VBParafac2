@@ -11,8 +11,8 @@ classdef multiNormalDist < probabilityDist
         meanOuterProduct
         meanOuterProductSingle
         meanInnerProductMatrix % E[X^T.X] (Constant value, if correct)
-%         meanInnerProductTransposed % E[X.X^T] (Constant value, if correct)
-        meanInnerProductSumComponent
+        %         meanInnerProductTransposed % E[X.X^T] (Constant value, if correct)
+        %meanInnerProductSumComponent
         distSquared
     end
     
@@ -39,22 +39,23 @@ classdef multiNormalDist < probabilityDist
         end
         
         function value = get.distSquared(obj)
-           value = obj.computeElementWiseSquared; 
+            value = obj.computeElementWiseSquared;
         end
         
-        function value = get.meanInnerProductSumComponent(obj)
-            %                 value = sum(sum(sum(obj.distSquared)));
+        function value = meanInnerProductSumComponent(obj,A)
             
             if ismatrix(obj.mean)
-                %                   value = trace(obj.mean*obj.mean')+trace(sum(obj.variance,3));
-                if obj.VarEqual
-                    value = sum(sum(obj.mean.^2))+obj.I*trace(obj.variance);
-                else
-                    value = sum(sum(obj.mean.^2))+trace(sum(obj.variance,3));
-                end
+                value = obj.computeMeanInnerProduct(eye(obj.J));
+               
+                %                 %                   value = trace(obj.mean*obj.mean')+trace(sum(obj.variance,3));
+                %                 if obj.VarEqual
+                %                     value = sum(sum(obj.mean.^2))+obj.I*trace(obj.variance);
+                %                 else
+                %                     value = sum(sum(obj.mean.^2))+trace(sum(obj.variance,3));
+                %                 end
             else
                 value = sum(sum(sum(obj.mean.^2)))+obj.I*...
-                sum(sum(sum(sum(bsxfun(@times,eye(obj.J),obj.variance)))));
+                    sum(sum(sum(sum(bsxfun(@times,eye(obj.J),obj.variance)))));
             end
         end
         
@@ -80,21 +81,21 @@ classdef multiNormalDist < probabilityDist
         end
         
         function updateStatistics(obj)
-           obj.computeEntropy;
+            obj.computeEntropy;
         end
     end
     
     % Functions with input from outside class
     methods (Access = public)
         function matrixIPS = computeMeanInnerProductScaledSlabs(obj,A,diagFlag)
-            % Computes the inner product <x'*A*x> scaled by A for all 
+            % Computes the inner product <x'*A*x> scaled by A for all
             % vectors x or only diag of <x'*A*x> if diagFlag is set
             if nargin < 2
                 A = eye(obj.J);
             end
             
             if nargin < 3
-               diagFlag = 0; 
+                diagFlag = 0;
             end
             
             if diagFlag
@@ -117,14 +118,26 @@ classdef multiNormalDist < probabilityDist
     % Functions not requiring input from outside the class
     methods (Access = protected)
         function value = computeElementWiseSquared(obj)
-            
+            % E[X.^2]
             variance=permute(squeeze(sum(bsxfun(@times,eye(obj.J),obj.variance),2)),[2 1 3]);
             
             value=bsxfun(@plus,variance,obj.mean.^2);
         end
         
+        function value = computeMeanInnerProduct(obj,A)
+            % E[xAx'] = Tr(A*Sigma)+mu*A*mu' =
+            
+            if obj.VarEqual
+                value = obj.I*sum(sum(A'.*obj.variance))+sum(sum((obj.mean'*obj.mean).*A));
+            else
+                value = sum(sum(A'.*sum(obj.variance,3)))+sum(sum((obj.mean'*obj.mean).*A));
+            end
+        end
+        
+        
         function value = computeMeanOuterProduct(obj)
-           
+            % E[x'x] = Sigma + mu'*mu
+            
             if ismatrix(obj.mean)
                 % sum of Sigma+mu*mu' for all mean vectors and Sigmas
                 
@@ -133,7 +146,7 @@ classdef multiNormalDist < probabilityDist
                 else
                     value = sum(obj.variance,3) + obj.mean'*obj.mean;
                 end
-            end 
+            end
             
         end
         
@@ -149,13 +162,13 @@ classdef multiNormalDist < probabilityDist
             end
             
         end
-         
+        
         function computeMean(obj)
             obj.mean;
         end
         
         function computeVariance(obj)
-             obj.variance;
+            obj.variance;
         end
         
         function computeEntropy(obj)
@@ -167,8 +180,8 @@ classdef multiNormalDist < probabilityDist
                 K = 1;
             end
             
-	gpuflag = 0;
-
+            gpuflag = 0;
+            
             if isa(obj.variance,'gpuArray')
                 %[~, U, P] = pagefun(@lu,obj.variance);
                 %du = pagefun(@diag,U);
@@ -179,24 +192,24 @@ classdef multiNormalDist < probabilityDist
                 %logdetValue = sum(sum(logdetValue,4),3);
                 
                 %value = obj.VarDim*(obj.J/2*(1+log(2*pi)))...
-                 %           +1/2*logdetValue;
-		obj.variance = gather(obj.variance);
-		gpuflag = 1;
-end
-
-   %         else
-                value = 0;
-                for i=1:obj.VarDim
-                    for k=1:K
-                        value = value+obj.J/2*(1+log(2*pi))...
-                            +1/2*logdet((obj.variance(:,:,i,k)));
-                    end
+                %           +1/2*logdetValue;
+                obj.variance = gather(obj.variance);
+                gpuflag = 1;
+            end
+            
+            %         else
+            value = 0;
+            for i=1:obj.VarDim
+                for k=1:K
+                    value = value+obj.J/2*(1+log(2*pi))...
+                        +1/2*logdet((obj.variance(:,:,i,k)));
                 end
-     		if gpuflag
-			obj.variance = gpuArray(obj.variance);
-		end
-           
-    %        end
+            end
+            if gpuflag
+                obj.variance = gpuArray(obj.variance);
+            end
+            
+            %        end
             
             
             if obj.VarEqual

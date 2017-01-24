@@ -9,9 +9,6 @@ function C = matrixProductPrSlab(obj,A,B)
 
 callerFunc = dbstack;
 callerFunc = callerFunc(1).name;
-           
-           
-
 
 method = obj.opts.matrixProductPrSlab;
 
@@ -45,7 +42,6 @@ switch method
             else
                 C(:,:,k) = A*B(:,:,k);
             end
-            
         end
         
     case 'mtimesx'

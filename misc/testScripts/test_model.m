@@ -8,9 +8,9 @@ warning off MATLAB:nearlySingularMatrix
 %%
 % myModel=varBayesModelParafac2;
 rng('default')
-I=50;
+I=20;
 J=I;
-K=30;
+K=10;
 M=4;
 Mesti = 4;
 
@@ -25,17 +25,17 @@ options.precision = [1e2 1e-6];
 rng(4)
 data = varBayesModelParafac2.generateDataFromModel(options);
 % data = permute(I1,[2 1 3]);
-%%
+%
 %
 
-normalModel = normalParafac2(data.X);
+%normalModel = normalParafac2(data.X);
 % normalModel = normalParafac2(permute(I1,[2 1 3]));
 
-normalModel.fitParafac2(4)
+%normalModel.fitParafac2(4)
 %
-%%
-normalModel.Parafac2Fit(data.Xtrue)
-%%
+%
+%normalModel.Parafac2Fit(data.Xtrue)
+%
 rng('default')
 myModel=varBayesModelParafac2(data,Mesti);
 
@@ -51,7 +51,7 @@ myModel.opts.estimationARD = 'max';
 myModel.opts.estimationNoise = 'avg';
 myModel.opts.matrixProductPrSlab = 'mtimesx';
 myModel.opts.nActiveComponents = 'threshold';
-myModel.opts.showIter = 10;
+myModel.opts.showIter = 50;
 myModel.opts.rngInput = 7;
 
 % data set; rng(3)
@@ -78,7 +78,7 @@ myModel.qDist.opts.activeParams = {'qA','qC','qP','qSigma','qF','qAlpha'};
 % myModel.opts.maxTime = 5;
 
 tic
-myModel.computeVarDistribution;
+myModel.computeVarDistribution(500);
 toc
 %myModel.qDist.SNR
 myModel.Parafac2Fit

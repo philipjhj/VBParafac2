@@ -30,6 +30,8 @@ classdef dataClass < handle
         Xrecon
         Xrecon_m
         
+        % Listener
+        ListenerHandle
     end
     
     properties
@@ -37,16 +39,37 @@ classdef dataClass < handle
         I
         J
         K
+        n_dims
+        F
     end
+    events
+       dataUpdated
+    end
+    
     methods
+        function obj = dataClass()
+            obj.ListenerHandle = addlistener(obj,'dataUpdated',@obj.setDimensions);
+        end
+        
+        function setDimensions(obj,~,~)
+            obj.n_dims = ndims(obj.X);
+            obj.F = obj.n_dims-2;
+            
+            obj.I = zeros(1,obj.F);
+            for f = 1:obj.F
+                obj.I(f) = size(obj.X,f);
+            end
+            
+            obj.J = size(obj.X,obj.n_dims-1);
+            obj.K = size(obj.X,obj.n_dims);
+        end
+        
         function set.X(obj,value)
             obj.X = value;
-            obj.I = size(obj.X,1);
-            obj.J = size(obj.X,2);
-            obj.K = size(obj.X,3);
+            notify(obj,'dataUpdated');
         end
+        
         function set.M(obj,value)
-            % Implment error checking here
             obj.M = value;
         end
     end

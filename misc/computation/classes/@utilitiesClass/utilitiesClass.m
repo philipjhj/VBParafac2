@@ -35,8 +35,11 @@ classdef utilitiesClass < handle
        
        % Utility functions
        C = matrixProductPrSlab(obj,A,B)
+       C = hadamardProductPrSlab(obj,A,B)
        invM = matrixInversePrSlab(obj,M)
        diagM = matrixDiagonalPrSlab(obj,M)
+       
+       B = transformToTensor(obj,A)
        
        
        % Display functions

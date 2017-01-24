@@ -12,6 +12,7 @@ classdef varBayesModelParafac2 < handle
         
         data
         util
+        
         opts
         % TODO: add statistics class
     end
@@ -120,9 +121,9 @@ classdef varBayesModelParafac2 < handle
             
             
             % Initialize on first iteration
-            if obj.data.iter == 1;
+            if obj.data.iter == 1
                 rng(obj.opts.rngInput);
-                obj.qDist = obj.qDist.initDist;
+                obj.qDist = obj.qDist.initializeVariationalDististribution;
                 
                 obj.n_components(1) = obj.qDist.nActiveComponents;
                 obj.n_components_hard(1) = obj.qDist.nActiveComponents('hard');
