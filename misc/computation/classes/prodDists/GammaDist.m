@@ -1,7 +1,4 @@
 classdef GammaDist < probabilityDist
-    % Summary of help
-    % description
-    
     properties
         alpha
         beta
@@ -11,8 +8,6 @@ classdef GammaDist < probabilityDist
     
     methods
         function obj = GammaDist(varname,arrayDim)
-            % Summary of constructor
-            
             type = 'Gamma';
             
             if nargin < 2

@@ -39,7 +39,10 @@ classdef utilitiesClass < handle
        invM = matrixInversePrSlab(obj,M)
        diagM = matrixDiagonalPrSlab(obj,M)
        
+       C = khatriRaoProduct(obj,A,B)
+       
        B = transformToTensor(obj,A)
+       
        
        
        % Display functions

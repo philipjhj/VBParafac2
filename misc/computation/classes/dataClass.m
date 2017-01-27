@@ -40,7 +40,7 @@ classdef dataClass < handle
         J
         K
         n_dims
-        F
+        R
     end
     events
        dataUpdated
@@ -53,11 +53,11 @@ classdef dataClass < handle
         
         function setDimensions(obj,~,~)
             obj.n_dims = ndims(obj.X);
-            obj.F = obj.n_dims-2;
+            obj.R = obj.n_dims-2;
             
-            obj.I = zeros(1,obj.F);
-            for f = 1:obj.F
-                obj.I(f) = size(obj.X,f);
+            obj.I = zeros(1,obj.R);
+            for r = 1:obj.R
+                obj.I(r) = size(obj.X,r);
             end
             
             obj.J = size(obj.X,obj.n_dims-1);

@@ -1,7 +1,4 @@
 classdef multiNormalDist < probabilityDist
-    % Summary of help
-    % description
-    
     properties
         VarEqual
         util
@@ -9,7 +6,7 @@ classdef multiNormalDist < probabilityDist
     
     properties (Dependent)
         meanOuterProduct
-        meanOuterProductSingle
+        meanOuterProductPrVec
         meanInnerProductMatrix % E[X^T.X] (Constant value, if correct)
         %         meanInnerProductTransposed % E[X.X^T] (Constant value, if correct)
         %meanInnerProductSumComponent
@@ -42,17 +39,10 @@ classdef multiNormalDist < probabilityDist
             value = obj.computeElementWiseSquared;
         end
         
-        function value = meanInnerProductSumComponent(obj,A)
+        function value = meanInnerProductSumComponent(obj)
             
             if ismatrix(obj.mean)
                 value = obj.computeMeanInnerProduct(eye(obj.J));
-               
-                %                 %                   value = trace(obj.mean*obj.mean')+trace(sum(obj.variance,3));
-                %                 if obj.VarEqual
-                %                     value = sum(sum(obj.mean.^2))+obj.I*trace(obj.variance);
-                %                 else
-                %                     value = sum(sum(obj.mean.^2))+trace(sum(obj.variance,3));
-                %                 end
             else
                 value = sum(sum(sum(obj.mean.^2)))+obj.I*...
                     sum(sum(sum(sum(bsxfun(@times,eye(obj.J),obj.variance)))));
@@ -66,13 +56,12 @@ classdef multiNormalDist < probabilityDist
             value = obj.computeMeanOuterProduct;
         end
         
-        function value = get.meanOuterProductSingle(obj)
+        function value = get.meanOuterProductPrVec(obj)
             % Computes the mean of the outer product (x'*x) for all vectors
             % x in distribution
             
-            value = obj.computeMeanOuterProductSingle;
+            value = obj.computeMeanOuterProductPrVec;
         end
-        
         
         function value = get.meanInnerProductMatrix(obj)
             % Computes the inner product (x*x') for all vectors x in
@@ -88,8 +77,8 @@ classdef multiNormalDist < probabilityDist
     % Functions with input from outside class
     methods (Access = public)
         function matrixIPS = computeMeanInnerProductScaledSlabs(obj,A,diagFlag)
-            % Computes the inner product <x'*A*x> scaled by A for all
-            % vectors x or only diag of <x'*A*x> if diagFlag is set
+            % Computes the inner product <x*A*x'> scaled by A for all
+            % vectors x or only diag of <x*A*x'> if diagFlag is set
             if nargin < 2
                 A = eye(obj.J);
             end
@@ -150,7 +139,7 @@ classdef multiNormalDist < probabilityDist
             
         end
         
-        function value = computeMeanOuterProductSingle(obj)
+        function value = computeMeanOuterProductPrVec(obj)
             if ismatrix(obj.mean)
                 % Sigma + mu*mu' for each mean vector and sigma pair
                 
