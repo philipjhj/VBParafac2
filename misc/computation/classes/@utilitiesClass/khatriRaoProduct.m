@@ -1,5 +1,4 @@
-function C=khatriRaoProduct(A,B);
-
+function C=khatriRaoProduct(obj,A,B)
 % Khatri Rao product
 % input
 % B m x n matrix

@@ -23,19 +23,16 @@ options.precision = [1e2 1e-6];
 % [1e4 1e-8] creates problems for qC
 
 rng(4)
-data = varBayesModelParafac2.generateDataFromModel(options);
+%data = varBayesModelParafac2.generateDataFromModel(options);
+
+% load('/media/data/Dropbox/Studie/PhD/publications/VBParafac2/data/chromatographic_fluo/fourwaydata.mat')
+% data = permute(reshape(X,DimX),[3 4 1 2]);
+% data(isnan(data))=rand;
+
 % data = permute(I1,[2 1 3]);
-%
-%
 
-%normalModel = normalParafac2(data.X);
-% normalModel = normalParafac2(permute(I1,[2 1 3]));
+data = 30*rand(50,50,50,50,10);
 
-%normalModel.fitParafac2(4)
-%
-%
-%normalModel.Parafac2Fit(data.Xtrue)
-%
 rng('default')
 myModel=varBayesModelParafac2(data,Mesti);
 
@@ -64,11 +61,7 @@ myModel.opts.rngInput = 7;
 %myModel.qDist.SNR
 % clc
 
-% myModel.qDist.opts.activeParams = {'qC','qAlpha','qSigma'};
-% myModel.qDist.opts.activeParams = {'qA','qF','qP','qC','qAlpha'};
 myModel.qDist.opts.activeParams = {'qA','qC','qP','qSigma','qF','qAlpha'};
-% myModel.qDist.opts.activeParams = {'qA','qP','qF'};
-% myModel.qDist.activeParams_opt = {'qC','qAlpha'};
 
 
 % clc

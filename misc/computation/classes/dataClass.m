@@ -1,6 +1,7 @@
 classdef dataClass < handle
     properties
         % Data
+        Xunfolded
         X
         M
         
@@ -52,20 +53,22 @@ classdef dataClass < handle
         end
         
         function setDimensions(obj,~,~)
-            obj.n_dims = ndims(obj.X);
+            obj.n_dims = ndims(obj.Xunfolded);
             obj.R = obj.n_dims-2;
             
             obj.I = zeros(1,obj.R);
             for r = 1:obj.R
-                obj.I(r) = size(obj.X,r);
+                obj.I(r) = size(obj.Xunfolded,r);
             end
             
-            obj.J = size(obj.X,obj.n_dims-1);
-            obj.K = size(obj.X,obj.n_dims);
+            obj.J = size(obj.Xunfolded,obj.n_dims-1);
+            obj.K = size(obj.Xunfolded,obj.n_dims);
+            
+            obj.X = reshape(obj.Xunfolded,[prod(obj.I) obj.J obj.K]);
         end
         
-        function set.X(obj,value)
-            obj.X = value;
+        function set.Xunfolded(obj,value)
+            obj.Xunfolded = value;
             notify(obj,'dataUpdated');
         end
         

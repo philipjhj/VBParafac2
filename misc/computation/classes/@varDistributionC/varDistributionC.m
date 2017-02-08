@@ -86,8 +86,9 @@ classdef varDistributionC < handle
         end
         
         function initializeVariationalFactors(obj)
-            obj.qA = multiNormalDist('qA',[obj.data.I obj.data.M],true,obj.util);
-            
+            for r = 1:obj.data.R
+                obj.qA{r} = multiNormalDist('qA',[obj.data.I(r) obj.data.M],true,obj.util);
+            end
             obj.qC = multiNormalDist('qC',[obj.data.K obj.data.M],false,obj.util);
             obj.qF = multiNormalDist('qF',[obj.data.M obj.data.M],false,obj.util);
             obj.qP = multiNormalDist('qP',[obj.data.J obj.data.M obj.data.K],true,obj.util);
@@ -226,7 +227,14 @@ classdef varDistributionC < handle
         function computeEntropyValues(obj,variationalFactorNames)
             for i  = 1:numel(variationalFactorNames)
                 methodStr = strcat(variationalFactorNames{i},'Entropy');
-                obj.(methodStr) = obj.(variationalFactorNames{i}).entropy;
+                if strcmp('qA',variationalFactorNames{i})
+                    obj.(methodStr) = 0;
+                    for r = 1:obj.data.R
+                        obj.(methodStr) = obj.(methodStr)+obj.(variationalFactorNames{i}){r}.entropy;
+                    end
+                else
+                    obj.(methodStr) = obj.(variationalFactorNames{i}).entropy;
+                end
             end
             
             obj.computeEntropySpecialCases;
@@ -253,15 +261,19 @@ classdef varDistributionC < handle
                 obj.util.matrixProductPrSlab(obj.data.X,obj.qP.mean),...
                 obj.qF.mean),obj.eD);
             
-            tempSum = sum(sum(sum(obj.util.hadamardProductPrSlab(temp,...
-                obj.util.transformToTensor(obj.qSigma.mean)),3).*obj.eA));
+            tempSum = sum(sum(obj.util.hadamardProductPrSlab(...
+                sum(obj.util.hadamardProductPrSlab(temp,...
+                obj.util.transformToTensor(obj.qSigma.mean)),3),obj.eA)));
             
-            obj.qXMeanLog = obj.data.J*obj.data.I/2*sum(obj.qSigma.MeanLog)-...
+            obj.qXMeanLog = obj.data.J*prod(obj.data.I)/2*sum(obj.qSigma.MeanLog)-...
                 1/2*sum(obj.qSigma.mean.*(...
                 sum(obj.eAiDFtPtPFDAi)+obj.XInnerProductPrSlab))+tempSum;
         end
         function computeqAMeanLog(obj)
-            obj.qAMeanLog = -1/2*obj.qA.meanInnerProductSumComponent;
+            obj.qAMeanLog = 0;
+            for r = 1:obj.data.R
+               obj.qAMeanLog = obj.qAMeanLog-1/2*obj.qA{r}.meanInnerProductSumComponent;
+            end
         end
         function computeqCMeanLog(obj)
             if isempty(obj.qAlpha.entropy) && strcmp(obj.opts.estimationARD,'avg')
@@ -331,7 +343,13 @@ classdef varDistributionC < handle
         
         function updateStatistics(obj,variationalFactorNames)
             for i  = 1:numel(variationalFactorNames)
-                obj.(variationalFactorNames{i}).updateStatistics;
+                if strcmp(variationalFactorNames{i},'qA')
+                    for r = 1:obj.data.R
+                       obj.(variationalFactorNames{i}){r}.updateStatistics; 
+                    end
+                else
+                    obj.(variationalFactorNames{i}).updateStatistics;
+                end
             end
             
             obj.updateStatisticsSpecialCases(variationalFactorNames);
@@ -375,16 +393,32 @@ classdef varDistributionC < handle
         
         % ## Normal distribution updates
         function updateqA(obj)
-            obj.qA.variance = inv(sum(obj.util.hadamardProductPrSlab(...
-                obj.eDFtPtPFD,obj.util.transformToTensor(obj.qSigma.mean)),3)...
-                +eye(obj.data.M));
-            
-            sum_k = sum(obj.util.hadamardProductPrSlab(...
-                obj.util.transformToTensor(obj.qSigma.mean),...
-                obj.util.matrixProductPrSlab(...
-                obj.util.matrixProductPrSlab(obj.eD,obj.eFtPt),...
-                permute(obj.data.X,[2 1 3]))),3);
-            obj.qA.mean = (obj.qA.variance*sum_k)';
+            for r = 1:obj.data.R
+                obj.compute_eDFtPtPFD(r);
+                diagProdA = 1;
+                X = obj.data.Xunfolded;
+                
+                % Contribution from the r-1 other modes
+                for r1 = [1:(r-1) (r+1):obj.data.R]
+                    diagProdA = obj.util.hadamardProductPrSlab(diagProdA,sum(obj.qA{r1}.mean,1));
+                    X = sum(X,r1);
+                end
+                diagProdA = diag(diagProdA);
+                X = squeeze(X);
+                
+                obj.qA{r}.variance = inv(sum(obj.util.hadamardProductPrSlab(...
+                    obj.eDFtPtPFD,obj.util.transformToTensor(obj.qSigma.mean)),3)...
+                    +eye(obj.data.M));
+
+                sum_k = sum(obj.util.hadamardProductPrSlab(...
+                    obj.util.transformToTensor(obj.qSigma.mean),...
+                    obj.util.matrixProductPrSlab(...,
+                    obj.util.matrixProductPrSlab(diagProdA,...
+                    obj.util.matrixProductPrSlab(obj.eD,obj.eFtPt)),...
+                    permute(X,[2 1 3]))),3);
+                obj.qA{r}.mean = (obj.qA{r}.variance*sum_k)';
+            end
+            obj.compute_eDFtPtPFD
         end
         function updateqC(obj)
             obj.qC.variance=obj.util.matrixInversePrSlab(...
@@ -518,7 +552,7 @@ classdef varDistributionC < handle
         % ## Gamma distribution updates
         function updateqSigma(obj)
             if strcmp(obj.opts.estimationNoise,'avg')
-                obj.qSigma.alpha(:) = obj.pSigma.alpha+obj.data.I*obj.data.J/2;
+                obj.qSigma.alpha(:) = obj.pSigma.alpha+prod(obj.data.I)*obj.data.J/2;
                 
                 obj.qSigma.beta = 1./(1./obj.pSigma.beta+1/2*...
                     sum(obj.eAiDFtPtPFDAi,1)+1/2*obj.XInnerProductPrSlab-...
@@ -551,9 +585,12 @@ classdef varDistributionC < handle
             obj.eD = obj.util.matrixDiagonalPrSlab(obj.qC.mean');
         end
         
-        function compute_eA(obj,r0)
-            % Expectation of A w.r.t. mode r0
-            obj.eA = obj.qA.mean;
+        function compute_eA(obj)
+            % Expectation of all modes in A
+            obj.eA = obj.qA{1}.mean;
+            for r = 2:obj.data.R
+                obj.eA = obj.util.khatriRaoProduct(obj.qA{r}.mean,obj.eA);
+            end
         end
         
         function compute_eFtPt(obj)
@@ -574,7 +611,10 @@ classdef varDistributionC < handle
         
         % ## Second or Higher Order
         function compute_eAtA(obj)
-           obj.eAtA = obj.qA.meanOuterProduct;
+           obj.eAtA = 1;
+           for r = 1:obj.data.R
+              obj.eAtA = obj.util.hadamardProductPrSlab(obj.qA{r}.meanOuterProduct,obj.eAtA); 
+           end
         end
         
         function compute_eCsquared(obj)
@@ -614,13 +654,20 @@ classdef varDistributionC < handle
             obj.eFtPtPF = value;
         end
         
-        function compute_eDFtPtPFD(obj)
+        function compute_eDFtPtPFD(obj,r0)
+            if nargin < 2
+                r0 = 1;
+            end
             value = obj.util.hadamardProductPrSlab(obj.eCtC,obj.eFtPtPF);
+            for r = [1:(r0-1) (r0+1):obj.data.R]
+                value = obj.util.hadamardProductPrSlab(obj.qA{r}.meanOuterProduct,value);
+            end
+            
             obj.eDFtPtPFD = value;
         end
         
         function compute_eAiDFtPtPFDAi(obj)
-            obj.eAiDFtPtPFDAi = obj.qA.computeMeanInnerProductScaledSlabs(obj.eDFtPtPFD,1);
+            obj.eAiDFtPtPFDAi = obj.qA{1}.computeMeanInnerProductScaledSlabs(obj.eDFtPtPFD,1);
         end
         
         function value = compute_XInnerProductPrSlab(obj)

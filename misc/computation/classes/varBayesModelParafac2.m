@@ -69,9 +69,8 @@ classdef varBayesModelParafac2 < handle
                 obj.data.M = M;
             else
                 % Load given data set
-                obj.data.X = X;
+                obj.data.Xunfolded = X;
                 obj.data.M = M;
-                [obj.data.I, obj.data.J, obj.data.K] = size(obj.data.X);
             end
             
             
@@ -419,9 +418,8 @@ classdef varBayesModelParafac2 < handle
         end
         
         function [fit,fit_true] = Parafac2Fit(obj)
-            
             residual=bsxfun(@minus,obj.data.X,obj.util.matrixProductPrSlab(...
-                obj.qDist.qA.mean,obj.util.matrixProductPrSlab(obj.qDist.eD,...
+                obj.qDist.eA,obj.util.matrixProductPrSlab(obj.qDist.eD,...
                 obj.util.matrixProductPrSlab(obj.qDist.qF.mean',permute(...
                 obj.qDist.qP.mean,[2 1 3])))));
             
@@ -471,7 +469,7 @@ classdef varBayesModelParafac2 < handle
             
             generatedData = dataClass;
             
-            generatedData.X = zeros([I J K]);
+            generatedData.Xunfolded = zeros([I J K]);
             generatedData.Xtrue = zeros([I J K]);
             generatedData.Mtrue= M;
             
@@ -542,7 +540,7 @@ classdef varBayesModelParafac2 < handle
                 end
                 
                 
-                generatedData.X = generatedData.Xtrue+generatedData.Etrue;
+                generatedData.Xunfolded = generatedData.Xtrue+generatedData.Etrue;
                 
             elseif strcmp(options.initMethod,'generative')
                 
@@ -577,7 +575,7 @@ classdef varBayesModelParafac2 < handle
                     generatedData.Xtrue(:,:,k) = generatedData.Atrue*diag(generatedData.Ctrue(k,:))*...
                         generatedData.Ftrue'*generatedData.Ptrue(:,:,k)';
                     
-                    generatedData.X(:,:,k) = generatedData.Xtrue(:,:,k)+generatedData.Etrue(:,:,k);
+                    generatedData.Xunfolded(:,:,k) = generatedData.Xtrue(:,:,k)+generatedData.Etrue(:,:,k);
                 end
             end
             
