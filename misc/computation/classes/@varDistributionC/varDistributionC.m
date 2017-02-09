@@ -96,6 +96,23 @@ classdef varDistributionC < handle
             
             obj.pSigma = GammaDist('pSigma',[1 1]);
             obj.pAlpha = GammaDist('pAlpha',[1 1]);
+            
+            if strcmpi(obj.opts.matrixProductPrSlab,'gpu')
+               obj.qA.mean = gpuArray(obj.qA.mean);
+               obj.qA.variance = gpuArray(obj.qA.variance);
+               obj.qC.mean = gpuArray(obj.qC.mean);
+               obj.qC.variance = gpuArray(obj.qC.variance);
+               obj.qF.mean = gpuArray(obj.qF.mean);
+               obj.qF.variance = gpuArray(obj.qF.variance);
+               obj.qP.mean = gpuArray(obj.qP.mean);
+               obj.qP.variance = gpuArray(obj.qP.variance);
+               
+               obj.qSigma.alpha = gpuArray(obj.qSigma.alpha);
+               obj.qSigma.beta= gpuArray(obj.qSigma.beta);
+               obj.qAlpha.alpha = gpuArray(obj.qAlpha.alpha);
+               obj.qAlpha.beta= gpuArray(obj.qAlpha.beta);
+            end
+            
         end
         function initializeSufficientStatistics(obj)
             % Initialize Shared Terms
@@ -176,7 +193,7 @@ classdef varDistributionC < handle
         % # ELBO computations
         
         function value = get.ELBO(obj)
-            value = obj.ePxz+obj.eQz;
+            value = gather(obj.ePxz+obj.eQz);
         end
         
         function value = get.ePxz(obj)
@@ -499,9 +516,15 @@ classdef varDistributionC < handle
                 qFeDeAtX=obj.util.matrixProductPrSlab(obj.qF.mean,...
                     obj.eDeAtXk);
                 
+                if strcmpi(obj.opts.matrixProductPrSlab,'gpu')
+                    qFeDeAtX = gather(qFeDeAtX);
+                end
                 for k = 1:obj.data.K
                     [U,~,V] = svd(qFeDeAtX(:,:,k),'econ');
                     obj.qP.mean(:,:,k) = V(:,1:obj.data.M)*U';
+                end
+                if strcmpi(obj.opts.matrixProductPrSlab,'gpu')
+                    obj.qP.mean = gpuArray(obj.qP.mean);
                 end
             end
             
@@ -635,14 +658,11 @@ classdef varDistributionC < handle
             end
             
             if strcmp(method,'hard')
-                if isa(obj.qC.mean,'gpuArray')
-                    nActive = sum(sum(gather(obj.qC.mean))~=0);
-                else
-                    nActive = sum(sum(obj.qC.mean)~=0);
-                end
+                nActive = sum(sum(obj.qC.mean)~=0);
             elseif strcmp(method,'threshold')
                 nActive = find(cumsum(sort(1./obj.qAlpha.mean,'descend')/sum(1./obj.qAlpha.mean))>0.95,1);
             end
+            nActive = gather(nActive);
         end
         
         % #################################################################

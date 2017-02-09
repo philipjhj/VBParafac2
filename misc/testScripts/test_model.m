@@ -1,7 +1,7 @@
 %load('/media/data/DataAndResults/Thesis/motor_normalized_all_subs.mat')
 % set_wd(2)
 % set(0,'DefaultFigureWindowStyle','docked')
-load('/media/data/DataAndResults/Thesis/data/dataBro/Models and data/Apple data/Int2.mat')
+%load('/media/data/DataAndResults/Thesis/data/dataBro/Models and data/Apple data/Int2.mat')
 %%
 
 warning off MATLAB:nearlySingularMatrix
@@ -12,7 +12,7 @@ I=20;
 J=I;
 K=20;
 M=4;
-Mesti = 4;
+Mesti = M;
 
 options.dimensions = [I J K M];
 options.initMethod = 'kiers';
@@ -64,8 +64,8 @@ myModel.opts.rngInput = 7;
 %myModel.qDist.SNR
 % clc
 
-% myModel.opts.activeParams = {'qA','qF','qP','qC','qAlpha','qSigma'};
-myModel.opts.activeParams = {'qA','qC','qP','qSigma','qF'};
+myModel.opts.activeParams = {'qA','qF','qP','qC','qAlpha','qSigma'};
+% myModel.opts.activeParams = {'qA','qC','qP','qSigma','qF'};
 
 
 % clc
@@ -75,12 +75,12 @@ myModel.opts.activeParams = {'qA','qC','qP','qSigma','qF'};
 % myModel.opts.maxTime = 5;
 
 tic
-myModel.fitTrainingData(500);
+myModel.fitTrainingData(15);
 toc
 %myModel.qDist.SNR
 % myModel.Parafac2Fit
 %%
-
+return
 for k=1:myModel.data.K
     
 clf

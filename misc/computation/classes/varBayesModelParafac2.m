@@ -46,7 +46,7 @@ classdef varBayesModelParafac2 < handle
         function partitionData(obj,X)
             disp('Partitioning data slices into 80% training set, 20% test set');
             
-            testPct = 0.2;
+            testPct = 0;
             
             obj.trainData = dataClass;
             obj.testData = dataClass;
@@ -240,6 +240,7 @@ classdef varBayesModelParafac2 < handle
                     fprintf('CAVI has stopped with a fit of %f %% with change %f\n',obj.Parafac2Fit(qDist),abs(diff)/abs(ELBO))
                     stopReason = 4;
                 end
+                
             end
             
             % Trim preallocated memory
@@ -249,6 +250,23 @@ classdef varBayesModelParafac2 < handle
             obj.evaltime_cpu = nonzeros(obj.evaltime_cpu)';
             obj.n_components = nonzeros(obj.n_components)';
             obj.n_components_hard = nonzeros(obj.n_components_hard)';
+            
+            % Gather results to CPU
+            if strcmpi(obj.opts.matrixProductPrSlab,'gpu')
+                qDist.qA.mean = gather(qDist.qA.mean);
+                qDist.qA.variance = gather(qDist.qA.variance);
+                qDist.qC.mean = gather(qDist.qC.mean);
+                qDist.qC.variance = gather(qDist.qC.variance);
+                qDist.qF.mean = gather(qDist.qF.mean);
+                qDist.qF.variance = gather(qDist.qF.variance);
+                qDist.qP.mean = gather(qDist.qP.mean);
+                qDist.qP.variance = gather(qDist.qP.variance);
+
+                qDist.qSigma.alpha = gather(qDist.qSigma.alpha);
+                qDist.qSigma.beta= gather(qDist.qSigma.beta);
+                qDist.qAlpha.alpha = gather(qDist.qAlpha.alpha);
+                qDist.qAlpha.beta= gather(qDist.qAlpha.beta);
+            end
         end
         
         
@@ -438,15 +456,11 @@ classdef varBayesModelParafac2 < handle
                 obj.util.matrixProductPrSlab(qDist.qF.mean',permute(...
                 qDist.qP.mean,[2 1 3])))));
             
-            sum_res = 0;
-            sum_x = 0;
-            for k = 1:qDist.data.K
-                sum_res = sum_res+norm(residual(:,:,k),'fro')^2;
-                sum_x = sum_x + norm(qDist.data.X(:,:,k),'fro')^2;
-            end
+            sum_res = norm(residual(:),'fro')^2;
+            sum_x = norm(qDist.data.X(:),'fro')^2;
             
-            fit=(1-sum_res/sum_x)*100;
-            fit_true=(1-sum_res/norm(qDist.data.Xtrue(:))^2)*100;
+            fit=gather((1-sum_res/sum_x)*100);
+            fit_true=gather((1-sum_res/norm(qDist.data.Xtrue(:))^2)*100);
             
         end
         
