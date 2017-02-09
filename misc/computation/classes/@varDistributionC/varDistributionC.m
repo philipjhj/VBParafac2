@@ -1,5 +1,5 @@
 classdef varDistributionC < handle
-    properties (Access = private)
+    properties %(Access = private)
         data
         util
     end
@@ -71,11 +71,11 @@ classdef varDistributionC < handle
     end
     
     methods
-        function obj = varDistributionC(modelobj)
+        function obj = varDistributionC(modelobj,data)
             % Class controling the full variational distribution
             % Belongs to a 'varBayesModelParafac2' object
             
-            obj.data = modelobj.data;
+            obj.data = data;
             obj.opts = modelobj.opts;
             obj.util = modelobj.util;
         end
@@ -100,7 +100,6 @@ classdef varDistributionC < handle
         function initializeSufficientStatistics(obj)
             % Initialize Shared Terms
             obj.XInnerProductPrSlab = obj.compute_XInnerProductPrSlab;
-            
             obj.updateSufficientStatistics;
             
             % Initialize ELBO terms

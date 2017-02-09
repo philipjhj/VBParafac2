@@ -10,7 +10,7 @@ warning off MATLAB:nearlySingularMatrix
 rng('default')
 I=20;
 J=I;
-K=10;
+K=20;
 M=4;
 Mesti = 4;
 
@@ -37,7 +37,7 @@ data = varBayesModelParafac2.generateDataFromModel(options);
 %normalModel.Parafac2Fit(data.Xtrue)
 %
 rng('default')
-myModel=varBayesModelParafac2(data,Mesti);
+myModel=varBayesModelParafac2(data.Xunfolded,Mesti);
 
 % size(myModel.data.X)
 %
@@ -51,7 +51,7 @@ myModel.opts.estimationARD = 'max';
 myModel.opts.estimationNoise = 'avg';
 myModel.opts.matrixProductPrSlab = 'mtimesx';
 myModel.opts.nActiveComponents = 'threshold';
-myModel.opts.showIter = 50;
+myModel.opts.showIter = 2;
 myModel.opts.rngInput = 7;
 
 % data set; rng(3)
@@ -64,11 +64,8 @@ myModel.opts.rngInput = 7;
 %myModel.qDist.SNR
 % clc
 
-% myModel.qDist.opts.activeParams = {'qC','qAlpha','qSigma'};
-% myModel.qDist.opts.activeParams = {'qA','qF','qP','qC','qAlpha'};
-myModel.qDist.opts.activeParams = {'qA','qC','qP','qSigma','qF','qAlpha'};
-% myModel.qDist.opts.activeParams = {'qA','qP','qF'};
-% myModel.qDist.activeParams_opt = {'qC','qAlpha'};
+% myModel.opts.activeParams = {'qA','qF','qP','qC','qAlpha','qSigma'};
+myModel.opts.activeParams = {'qA','qC','qP','qSigma','qF'};
 
 
 % clc
@@ -78,10 +75,10 @@ myModel.qDist.opts.activeParams = {'qA','qC','qP','qSigma','qF','qAlpha'};
 % myModel.opts.maxTime = 5;
 
 tic
-myModel.computeVarDistribution(500);
+myModel.fitTrainingData(500);
 toc
 %myModel.qDist.SNR
-myModel.Parafac2Fit
+% myModel.Parafac2Fit
 %%
 
 for k=1:myModel.data.K

@@ -1,7 +1,9 @@
 classdef dataClass < handle
     properties
         % Data
-        X
+        Xunfolded
+        X % training data
+%         Xtest
         M
         
         % True latent variables (if generated)
@@ -43,29 +45,42 @@ classdef dataClass < handle
         R
     end
     events
-       dataUpdated
+%         dimensionsUpdated
+        dataUpdated
     end
     
     methods
         function obj = dataClass()
             obj.ListenerHandle = addlistener(obj,'dataUpdated',@obj.setDimensions);
+%             obj.ListenerHandle = addlistener(obj,'dimensionsUpdated',@obj.partitionTestData);
         end
         
+%         function partitionTestData(obj,~,~)
+%             obj.X = reshape(obj.Xunfolded,prod(obj.I),obj.J,obj.K);
+%             allSlices = 1:obj.K;
+%             testSlices = randsample(obj.K,2);
+%             obj.Xtest = obj.X(:,:,testSlices);
+%             obj.X=obj.X(:,:,allSlices(~ismember(allSlices,testSlices)));
+%         end
+        
+        
         function setDimensions(obj,~,~)
-            obj.n_dims = ndims(obj.X);
+            obj.n_dims = ndims(obj.Xunfolded);
             obj.R = obj.n_dims-2;
             
             obj.I = zeros(1,obj.R);
             for r = 1:obj.R
-                obj.I(r) = size(obj.X,r);
+                obj.I(r) = size(obj.Xunfolded,r);
             end
             
-            obj.J = size(obj.X,obj.n_dims-1);
-            obj.K = size(obj.X,obj.n_dims);
+            obj.J = size(obj.Xunfolded,obj.n_dims-1);
+            obj.K = size(obj.Xunfolded,obj.n_dims);
+            obj.X = reshape(obj.Xunfolded,prod(obj.I),obj.J,obj.K);
+%             notify(obj,'dimensionsUpdated');
         end
         
-        function set.X(obj,value)
-            obj.X = value;
+        function set.Xunfolded(obj,value)
+            obj.Xunfolded = value;
             notify(obj,'dataUpdated');
         end
         
@@ -77,8 +92,8 @@ classdef dataClass < handle
     
     methods (Static)
         function ssq = computeNoiseLevel(obj,SNR)
-        
-           
+            
+            
             if numel(SNR) == 1
                 ssq = norm(obj.Xtrue(:),'fro')^2/(obj.I*obj.J*obj.K*(10^(SNR/10)));
                 
@@ -86,7 +101,7 @@ classdef dataClass < handle
                 
                 ssq = zeros(1,obj.K);
                 for k = 1:obj.K
-                   ssq(k) =  norm(obj.Xtrue(:,:,k),'fro')^2/(obj.I*obj.J*(10^(SNR(k)/10)));
+                    ssq(k) =  norm(obj.Xtrue(:,:,k),'fro')^2/(obj.I*obj.J*(10^(SNR(k)/10)));
                 end
                 
             else

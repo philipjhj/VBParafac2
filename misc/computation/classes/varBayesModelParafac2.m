@@ -7,10 +7,21 @@ classdef varBayesModelParafac2 < handle
         n_components_hard
         evaltime
         evaltime_cpu
-        % Variational Distribution
-        qDist
         
-        data
+        test_ELBO_chain
+        test_fit_chain
+        test_n_components
+        test_n_components_hard
+        test_evaltime
+        test_evaltime_cpu
+        
+        % Variational Distributions
+        qDistTrain
+        qDistTest
+        
+        testData
+        trainData
+        
         util
         
         opts
@@ -20,8 +31,6 @@ classdef varBayesModelParafac2 < handle
     properties (Dependent)
         n_neg_ELBO_diff
         n_neg_ELBO_diff_idx
-        
-        
     end
     
     methods
@@ -34,56 +43,50 @@ classdef varBayesModelParafac2 < handle
             value = find(diff(nonzeros(obj.ELBO_chain))<0);
         end
         
+        function partitionData(obj,X)
+            disp('Partitioning data slices into 80% training set, 20% test set');
+            
+            testPct = 0.2;
+            
+            obj.trainData = dataClass;
+            obj.testData = dataClass;
+            
+            dims = size(X);
+            K=dims(end);
+            nPrSlice = prod(dims(1:(end-1)));
+            
+            allSlices = 1:K;
+            testSlices = randsample(K,floor(testPct*K));
+            trainSlices = allSlices(~ismember(allSlices,testSlices));
+            
+            X = reshape(X,nPrSlice,K);
+            obj.testData.Xunfolded = reshape(X(:,testSlices),[dims(1:(end-1)) numel(testSlices)]);
+            obj.trainData.Xunfolded = reshape(X(:,trainSlices),[dims(1:(end-1)) numel(trainSlices)]);
+        end
+        
         function obj = varBayesModelParafac2(X,M)
-            % Summary of constructor
-            
-            %             mtimesx('SPEED');
-            
-            obj.data = dataClass;
             obj.opts = optionsClass;
             obj.util = utilitiesClass(obj);
             
             obj.opts.maxTime = realmax;
             
-            % Some dims to test
-            I = 100;
-            J = I;
-            K = 10;
             
-            Mtrue = 10;
-            Mesti = Mtrue;
+            % Load given data set
+            obj.partitionData(X);
             
-            
-            
-            if  nargin < 1
-                % Use default precision values
-                obj.data = obj.generateDataFromModel([I J K Mtrue]);
-                obj.data.M = Mesti;
-            elseif numel(X) == 2
-                % Set precision with input in X
-                obj.data = obj.generateDataFromModel([I J K Mtrue],X);
-                obj.data.M = Mesti;
-            elseif isa(X,'dataClass')
-                % Store/reference already generated data
-                obj.data = X;
-                obj.data.M = M;
-            else
-                % Load given data set
-                obj.data.X = X;
-                obj.data.M = M;
-                [obj.data.I, obj.data.J, obj.data.K] = size(obj.data.X);
-            end
-            
+            obj.trainData.M = M;
+            obj.testData.M = M;
             
             % Create variational distribution object
-            obj.qDist = varDistributionC(obj);
+            obj.qDistTrain = varDistributionC(obj,obj.trainData);
+            obj.qDistTest = varDistributionC(obj,obj.testData);
         end
         
         
-        function restartqDist(obj)
-            clear obj.qDist;
-            obj.qDist = varDistributionC(obj);
-            obj.data.iter = 1;
+        function restartqDistTrain(obj)
+            clear obj.qDistTrain;
+            obj.qDistTrain = varDistributionC(obj);
+            obj.trainData.iter = 1;
             
             obj.ELBO_chain = [];
             obj.fit_chain = [];
@@ -94,16 +97,26 @@ classdef varBayesModelParafac2 < handle
             
         end
         
-        function [stopReason,errorStatus] = computeVarDistribution(obj,maxiter)
+        function fitTrainingData(obj,maxiter)
+            [obj.qDistTrain,obj.trainData]=obj.computeVarDistribution(maxiter,obj.qDistTrain,obj.trainData);
+        end
+        
+        function fitTestData(obj,maxiter)
+            previous_opt = obj.opts.activeParams;
+            obj.opts.activeParams = {'qP','qC','qSigma'};
+            obj.qDistTest.qA = obj.qDistTrain.qA;
+            obj.qDistTest.qF = obj.qDistTrain.qF;
+            [obj.qDistTest,obj.testData]=obj.computeVarDistribution(maxiter,obj.qDistTest,obj.testData);
+            obj.opts.activeParams = previous_opt;
+        end
+        
+        function [qDist,data,stopReason,errorStatus] = computeVarDistribution(obj,maxiter,qDist,data)
             
             if obj.opts.verbose
                 disp('Starting CAVI with:')
-                disp(obj.qDist.opts.activeParams)
+                disp(qDist.opts.activeParams)
                 %             disp('\n')
             end
-            
-            % Implementation of CAVI to compute the variational distribution
-            % of the probabilistic Parafac2 model
             
             % Set options and meta data
             if nargin < 2
@@ -115,18 +128,18 @@ classdef varBayesModelParafac2 < handle
             stopReason = 0;
             errorStatus = 0;
             
-            if isempty(obj.data.iter)
-                obj.data.iter = 1;
+            if isempty(data.iter)
+                data.iter = 1;
             end
             
             
             % Initialize on first iteration
-            if obj.data.iter == 1
+            if data.iter == 1
                 rng(obj.opts.rngInput);
-                obj.qDist = obj.qDist.initializeVariationalDististribution;
+                qDist = qDist.initializeVariationalDististribution;
                 
-                obj.n_components(1) = obj.qDist.nActiveComponents;
-                obj.n_components_hard(1) = obj.qDist.nActiveComponents('hard');
+                obj.n_components(1) = qDist.nActiveComponents;
+                obj.n_components_hard(1) = qDist.nActiveComponents('hard');
                 obj.evaltime(1) = 1e-10;
                 obj.evaltime_cpu(1) = 1e-10;
             end
@@ -135,7 +148,7 @@ classdef varBayesModelParafac2 < handle
             startTime_cpu = obj.evaltime_cpu(obj.evaltime_cpu==max(obj.evaltime_cpu));
             
             % Compute Initial ELBO
-            ELBO = obj.qDist.ELBO;
+            ELBO = qDist.ELBO;
             ELBO_prev = 0;
             diff = ELBO-ELBO_prev;
             
@@ -146,21 +159,21 @@ classdef varBayesModelParafac2 < handle
             % Update Variational Factors until ELBO has converged
             ticCAVI=tic;
             t_CAVI_cpu = cputime;
-            while abs(diff)/abs(ELBO) > obj.opts.tol && obj.opts.maxiter+1 > obj.data.iter...
+            while abs(diff)/abs(ELBO) > obj.opts.tol && obj.opts.maxiter+1 > data.iter...
                     && obj.opts.maxTime > obj.evaltime(obj.evaltime==max(obj.evaltime))
                 
                 % Update active (see options) variational factors
-                obj.qDist.updateMoments;
+                qDist.updateMoments;
                 
                 
                 % Compute ELBO
                 ELBO_prev = ELBO;
-                ELBO = obj.qDist.ELBO;
+                ELBO = qDist.ELBO;
                 
                 diff = ELBO-ELBO_prev;
                 
                 % Store progress information
-                if isempty(obj.ELBO_chain) || numel(obj.ELBO_chain)<obj.data.iter+1
+                if isempty(obj.ELBO_chain) || numel(obj.ELBO_chain)<data.iter+1
                     obj.ELBO_chain = [obj.ELBO_chain zeros(1,100)];
                     obj.fit_chain = [obj.fit_chain zeros(1,100)];
                     obj.evaltime = [obj.evaltime zeros(1,100)];
@@ -168,42 +181,42 @@ classdef varBayesModelParafac2 < handle
                     obj.n_components = [obj.n_components zeros(1,100)];
                     obj.n_components_hard = [obj.n_components_hard zeros(1,100)];
                 end
-                obj.ELBO_chain(obj.data.iter) = ELBO;
-                obj.fit_chain(obj.data.iter) = obj.Parafac2Fit;
-                obj.evaltime(obj.data.iter) = toc(ticCAVI)+startTime;
-                obj.evaltime_cpu(obj.data.iter) = cputime-t_CAVI_cpu+startTime_cpu;
-                obj.n_components(obj.data.iter) = obj.qDist.nActiveComponents;
-                obj.n_components_hard(obj.data.iter) = obj.qDist.nActiveComponents('hard');
+                obj.ELBO_chain(data.iter) = ELBO;
+                obj.fit_chain(data.iter) = obj.Parafac2Fit(qDist);
+                obj.evaltime(data.iter) = toc(ticCAVI)+startTime;
+                obj.evaltime_cpu(data.iter) = cputime-t_CAVI_cpu+startTime_cpu;
+                obj.n_components(data.iter) = qDist.nActiveComponents;
+                obj.n_components_hard(data.iter) = qDist.nActiveComponents('hard');
                 
                 % Check convergence
-                if obj.opts.debugFlag >= 1 && diff/abs(ELBO) < -1e-7 && obj.data.iter>0
+                if obj.opts.debugFlag >= 1 && diff/abs(ELBO) < -1e-7 && data.iter>0
                     warning('off','backtrace')
                     warning('At iter %d ELBO not converging; relativ diff. is %.10f, diff; %.4f \n',...
-                        obj.data.iter,diff/abs(ELBO),diff)
+                        data.iter,diff/abs(ELBO),diff)
                     warning('on','backtrace')
                     %                     keyboard
                     errorStatus=-1;
-                    fprintf('%5d',obj.data.iter);
-                    obj.displayResultsAll(diff);
+                    fprintf('%5d',data.iter);
+                    obj.displayResultsAll(diff,qDist);
                     %                     break
                 end
                 
                 
                 
                 % Display Progress
-                if obj.opts.verbose && obj.data.iter ~= 0 && mod(obj.data.iter,obj.opts.showIter) == 0
+                if obj.opts.verbose && data.iter ~= 0 && mod(data.iter,obj.opts.showIter) == 0
                     
                     % Output progress
                     % ...
-                    fprintf('%5d',obj.data.iter);
-                    obj.displayResultsAll(diff);
+                    fprintf('%5d',data.iter);
+                    obj.displayResultsAll(diff,qDist);
                 end
                 
-                if obj.Parafac2Fit/100>=1%(1-obj.opts.tol)
+                if obj.Parafac2Fit(qDist)/100>=1%(1-obj.opts.tol)
                     break;
                 end
                 
-                obj.data.iter = obj.data.iter+1;
+                data.iter = data.iter+1;
             end
             
             if obj.opts.verbose
@@ -217,15 +230,15 @@ classdef varBayesModelParafac2 < handle
                 if diff/abs(ELBO) < obj.opts.tol
                     fprintf('CAVI has converged with last change %f\n', abs(diff)/abs(ELBO))
                     stopReason = 1;
-                elseif obj.opts.maxiter <= obj.data.iter
-                    fprintf('CAVI has stopped at iteration %d (max iteration) with change %f\n',obj.data.iter-1,abs(diff)/abs(ELBO))
+                elseif obj.opts.maxiter <= data.iter
+                    fprintf('CAVI has stopped at iteration %d (max iteration) with change %f\n',data.iter-1,abs(diff)/abs(ELBO))
                     stopReason = 2;
                 elseif obj.opts.maxTime <= obj.evaltime(obj.evaltime==max(obj.evaltime))
                     fprintf('CAVI has stopped after %f s. evaluation (max time) with change %f\n',obj.evaltime(obj.evaltime==max(obj.evaltime)),abs(diff)/abs(ELBO))
                     stopReason = 3;
-                elseif obj.Parafac2Fit/100>(1-obj.opts.tol)
-                    fprintf('CAVI has stopped with a fit of %f %% with change %f\n',obj.Parafac2Fit,abs(diff)/abs(ELBO))
-                    stopReason = 4;    
+                elseif obj.Parafac2Fit(qDist)/100>(1-obj.opts.tol)
+                    fprintf('CAVI has stopped with a fit of %f %% with change %f\n',obj.Parafac2Fit(qDist),abs(diff)/abs(ELBO))
+                    stopReason = 4;
                 end
             end
             
@@ -242,7 +255,7 @@ classdef varBayesModelParafac2 < handle
         function displayHeader(obj)
             %'ELBO','ePxz','eQz'
             names = {'# comps','# strict','ELBO Diff','ELBO','Fit'};
-                %'eX','eA','eC','eF','eP','eSigma','eAlpha','hA','hC','hF','hP','hSigma','hAlpha'};
+            %'eX','eA','eC','eF','eP','eSigma','eAlpha','hA','hC','hF','hP','hSigma','hAlpha'};
             
             fprintf('%5s','Iter');
             for i = 1:numel(names)
@@ -252,40 +265,40 @@ classdef varBayesModelParafac2 < handle
         end
         
         
-        function displayResults(obj)
+        function displayResults(obj,qDist)
             
             %             disp(repmat('*',1,20))
-            %             fprintf('ELBO: %f \n',obj.qDist.ELBO);
-            %             fprintf('ePxz: %f \n',obj.qDist.ePxz);
-            %             fprintf('eQz: %f \n',obj.qDist.eQz);
+            %             fprintf('ELBO: %f \n',obj.qDistTrain.ELBO);
+            %             fprintf('ePxz: %f \n',obj.qDistTrain.ePxz);
+            %             fprintf('eQz: %f \n',obj.qDistTrain.eQz);
             fprintf('%15.2e',...
-                obj.qDist.ELBO)%,obj.qDist.ePxz,obj.qDist.eQz,...
-            %                   obj.qDist.XqMeanLog,obj.qDist.AqMeanLog,obj.qDist.CqMeanLog,...
-            %                   obj.qDist.FqMeanLog,obj.qDist.PqMeanLog,obj.qDist.SigmaqMeanLog,...
-            %                   obj.qDist.AlphaqMeanLog,obj.qDist.AqEntropy,obj.qDist.CqEntropy,...
-            %                   obj.qDist.FqEntropy,obj.qDist.PqEntropy,obj.qDist.SigmaqEntropy,...
-            %                   obj.qDist.AlphaqEntropy)
+                qDist.ELBO)%,obj.qDistTrain.ePxz,obj.qDistTrain.eQz,...
+            %                   obj.qDistTrain.XqMeanLog,obj.qDistTrain.AqMeanLog,obj.qDistTrain.CqMeanLog,...
+            %                   obj.qDistTrain.FqMeanLog,obj.qDistTrain.PqMeanLog,obj.qDistTrain.SigmaqMeanLog,...
+            %                   obj.qDistTrain.AlphaqMeanLog,obj.qDistTrain.AqEntropy,obj.qDistTrain.CqEntropy,...
+            %                   obj.qDistTrain.FqEntropy,obj.qDistTrain.PqEntropy,obj.qDistTrain.SigmaqEntropy,...
+            %                   obj.qDistTrain.AlphaqEntropy)
             fprintf('\n')
             
         end
         
-        function displayResultsAll(obj,diff)
+        function displayResultsAll(obj,diff,qDist)
             
             %             disp(repmat('*',1,20))
-            %             fprintf('ELBO: %f \n',obj.qDist.ELBO);
-            %             fprintf('ePxz: %f \n',obj.qDist.ePxz);
-            %             fprintf('eQz: %f \n',obj.qDist.eQz);
-            %                   obj.qDist.ELBO,obj.qDist.ePxz,obj.qDist.eQz,...
-            ELBO = obj.ELBO_chain(obj.data.iter);
-            fprintf('%10d',obj.n_components(obj.data.iter),obj.n_components_hard(obj.data.iter));
+            %             fprintf('ELBO: %f \n',obj.qDistTrain.ELBO);
+            %             fprintf('ePxz: %f \n',obj.qDistTrain.ePxz);
+            %             fprintf('eQz: %f \n',obj.qDistTrain.eQz);
+            %                   obj.qDistTrain.ELBO,obj.qDistTrain.ePxz,obj.qDistTrain.eQz,...
+            ELBO = obj.ELBO_chain(qDist.data.iter);
+            fprintf('%10d',obj.n_components(qDist.data.iter),obj.n_components_hard(qDist.data.iter));
             fprintf('%10.2e',...
                 diff,...
-                ELBO,obj.fit_chain(obj.data.iter));
-%                 obj.qDist.qXMeanLog,obj.qDist.qAMeanLog,obj.qDist.qCMeanLog,...
-%                 obj.qDist.qFMeanLog,obj.qDist.qPMeanLog,obj.qDist.qSigmaMeanLog,...
-%                 obj.qDist.qAlphaMeanLog,obj.qDist.qAEntropy,obj.qDist.qCEntropy,...
-%                 obj.qDist.qFEntropy,obj.qDist.qPEntropy,obj.qDist.qSigmaEntropy,...
-%                 obj.qDist.qAlphaEntropy)
+                ELBO,obj.fit_chain(qDist.data.iter));
+            %                 obj.qDistTrain.qXMeanLog,obj.qDistTrain.qAMeanLog,obj.qDistTrain.qCMeanLog,...
+            %                 obj.qDistTrain.qFMeanLog,obj.qDistTrain.qPMeanLog,obj.qDistTrain.qSigmaMeanLog,...
+            %                 obj.qDistTrain.qAlphaMeanLog,obj.qDistTrain.qAEntropy,obj.qDistTrain.qCEntropy,...
+            %                 obj.qDistTrain.qFEntropy,obj.qDistTrain.qPEntropy,obj.qDistTrain.qSigmaEntropy,...
+            %                 obj.qDistTrain.qAlphaEntropy)
             fprintf('\n')
             
         end
@@ -296,10 +309,10 @@ classdef varBayesModelParafac2 < handle
             
             obj.data.Xrecon_m = zeros(obj.data.I,obj.data.J,obj.data.K,obj.data.M);
             
-            A = obj.qDist.qA.mean;
-            D = obj.qDist.eD;
-            F = obj.qDist.qF.mean;
-            P = obj.qDist.qP.mean;
+            A = obj.qDistTrain.qA.mean;
+            D = obj.qDistTrain.eD;
+            F = obj.qDistTrain.qF.mean;
+            P = obj.qDistTrain.qP.mean;
             
             for m = 1:obj.data.M
                 obj.data.Xrecon_m(:,:,:,m) = obj.util.matrixProductPrSlab(...
@@ -309,14 +322,14 @@ classdef varBayesModelParafac2 < handle
             
             obj.data.Xrecon = sum(obj.data.Xrecon_m,4);
             
-            if ~isempty(obj.data.Xtrue) && isempty(obj.data.Xtrue_m) 
+            if ~isempty(obj.data.Xtrue) && isempty(obj.data.Xtrue_m)
                 
                 obj.data.Xtrue_m = zeros(obj.data.I,obj.data.J,obj.data.K,obj.data.M);
                 
                 A = obj.data.Atrue;
                 D = bsxfun(@mtimes,reshape(obj.data.Ctrue',1,...
-                obj.data.Mtrue,obj.data.K),...
-                repmat(eye(obj.data.Mtrue),1,1,obj.data.K));
+                    obj.data.Mtrue,obj.data.K),...
+                    repmat(eye(obj.data.Mtrue),1,1,obj.data.K));
                 F = obj.data.Ftrue;
                 P = obj.data.Ptrue;
                 
@@ -339,18 +352,18 @@ classdef varBayesModelParafac2 < handle
             
             %             MLEflag = 1;
             
-            [~,index]= sort(obj.qDist.qAlpha.mean,'ascend');
+            [~,index]= sort(obj.qDistTrain.qAlpha.mean,'ascend');
             
-            plotParafac2SolutionK(k,bsxfun(@minus,obj.data.X,obj.data.Etrue),obj.qDist.qA.mean,obj.qDist.qC.mean,...
-                obj.qDist.qF.mean,obj.qDist.qP.mean,obj.data.Atrue,obj.data.Ctrue,...
-                obj.data.Ftrue,obj.data.Ptrue,MLEflag,obj.qDist.nActiveComponents,index);
+            plotParafac2SolutionK(k,bsxfun(@minus,obj.data.X,obj.data.Etrue),obj.qDistTrain.qA.mean,obj.qDistTrain.qC.mean,...
+                obj.qDistTrain.qF.mean,obj.qDistTrain.qP.mean,obj.data.Atrue,obj.data.Ctrue,...
+                obj.data.Ftrue,obj.data.Ptrue,MLEflag,obj.qDistTrain.nActiveComponents,index);
             
             
         end
         
         
         function plotSolutionRealMatrixK(obj,k)
-            xRecon = obj.qDist.qA.mean*diag(obj.qDist.qC.mean(k,:))*obj.qDist.qF.mean'*obj.qDist.qP.mean(:,:,k)';
+            xRecon = obj.qDistTrain.qA.mean*diag(obj.qDistTrain.qC.mean(k,:))*obj.qDistTrain.qF.mean'*obj.qDistTrain.qP.mean(:,:,k)';
             
             subplot(1,3,1)
             imagesc(obj.data.X(:,:,k))
@@ -368,13 +381,13 @@ classdef varBayesModelParafac2 < handle
         
         function plotSolutionReal3D(obj,k,m,mask)
             set(0,'DefaultFigureWindowStyle','docked')
-            %             sortedAIDX = obj.sortComponents(obj.qDist.qA.mean);
+            %             sortedAIDX = obj.sortComponents(obj.qDistTrain.qA.mean);
             
-            [~,sortedAIDX]=sort(abs(obj.qDist.qC.mean(k,:)),'descend');
+            [~,sortedAIDX]=sort(abs(obj.qDistTrain.qC.mean(k,:)),'descend');
             
             disp(sortedAIDX(m))
-            U = obj.qDist.qA.mean(:,sortedAIDX(m));
-            V = mean(obj.qDist.qP.mean(:,sortedAIDX(m),:),3);%*obj.qDist.qF.mean(sortedAIDX(m),:);
+            U = obj.qDistTrain.qA.mean(:,sortedAIDX(m));
+            V = mean(obj.qDistTrain.qP.mean(:,sortedAIDX(m),:),3);%*obj.qDistTrain.qF.mean(sortedAIDX(m),:);
             
             plotComponent(U,V', mask, [ 53    63    46])
         end
@@ -412,35 +425,35 @@ classdef varBayesModelParafac2 < handle
         
         function plotHinton(obj)
             set(0,'DefaultFigureWindowStyle','normal')
-            H = hinton(obj.qDist.qC.mean);% ones(obj.data.K,obj.data.M));
+            H = hinton(obj.qDistTrain.qC.mean);% ones(obj.data.K,obj.data.M));
             %             SET(H, 'INVERTHARDCOPY', 'OFF') (if printed as hardcopy, need to opposit
             %             colors)
             
         end
         
-        function [fit,fit_true] = Parafac2Fit(obj)
+        function [fit,fit_true] = Parafac2Fit(obj,qDist)
             
-            residual=bsxfun(@minus,obj.data.X,obj.util.matrixProductPrSlab(...
-                obj.qDist.qA.mean,obj.util.matrixProductPrSlab(obj.qDist.eD,...
-                obj.util.matrixProductPrSlab(obj.qDist.qF.mean',permute(...
-                obj.qDist.qP.mean,[2 1 3])))));
+            residual=bsxfun(@minus,qDist.data.X,obj.util.matrixProductPrSlab(...
+                qDist.qA.mean,obj.util.matrixProductPrSlab(qDist.eD,...
+                obj.util.matrixProductPrSlab(qDist.qF.mean',permute(...
+                qDist.qP.mean,[2 1 3])))));
             
             sum_res = 0;
             sum_x = 0;
-            for k = 1:obj.data.K
+            for k = 1:qDist.data.K
                 sum_res = sum_res+norm(residual(:,:,k),'fro')^2;
-                sum_x = sum_x + norm(obj.data.X(:,:,k),'fro')^2;
+                sum_x = sum_x + norm(qDist.data.X(:,:,k),'fro')^2;
             end
             
             fit=(1-sum_res/sum_x)*100;
-            fit_true=(1-sum_res/norm(obj.data.Xtrue(:))^2)*100;
+            fit_true=(1-sum_res/norm(qDist.data.Xtrue(:))^2)*100;
             
         end
         
         
-        function value = SNR(obj)
-            value = norm(obj.data.Xtrue(:))^2/norm(obj.data.Etrue(:))^2;
-            disp((sum(1./obj.data.Alphatrue))/(1/obj.data.Sigmatrue(1)))
+        function value = SNR(obj,qDist)
+            value = norm(qDist.data.Xtrue(:))^2/norm(qDist.data.Etrue(:))^2;
+            disp((sum(1./qDist.data.Alphatrue))/(1/qDist.data.Sigmatrue(1)))
             disp(value)
         end
         
@@ -456,7 +469,7 @@ classdef varBayesModelParafac2 < handle
         %             if obj.data.I>1e4
         %m=matfile('/media/data/DataAndResults/Thesis/motor_normalized_all_subs.mat');
         %obj.data.X = m.Y;
-        %                 obj.qDist.compute_eAiDFtPtPFDAi;
+        %                 obj.qDistTrain.compute_eAiDFtPtPFDAi;
         %             end
         %end
         
@@ -471,7 +484,7 @@ classdef varBayesModelParafac2 < handle
             
             generatedData = dataClass;
             
-            generatedData.X = zeros([I J K]);
+            generatedData.Xunfolded = zeros([I J K]);
             generatedData.Xtrue = zeros([I J K]);
             generatedData.Mtrue= M;
             
@@ -493,7 +506,7 @@ classdef varBayesModelParafac2 < handle
                     C = rand(K,M);
                     for m1 = 1:M
                         for m2 = (m1+1):M
-                        score(m1,m2) = congruenceScore(C(:,m1),C(:,m2));
+                            score(m1,m2) = congruenceScore(C(:,m1),C(:,m2));
                         end
                     end
                     i = i+1;
@@ -504,7 +517,7 @@ classdef varBayesModelParafac2 < handle
                 generatedData.Ptrue = zeros(generatedData.J,generatedData.Mtrue,generatedData.K);
                 
                 generatedData.Etrue = zeros(I,J,K);
-
+                
                 
                 
                 
@@ -523,7 +536,7 @@ classdef varBayesModelParafac2 < handle
                     
                 end
                 
-%                 SNR = linspace(-4,0,generatedData.K);
+                %                 SNR = linspace(-4,0,generatedData.K);
                 SNR = [repmat(-20,1,5) zeros(1,generatedData.K-5)];
                 
                 
@@ -532,17 +545,17 @@ classdef varBayesModelParafac2 < handle
                 generatedData.Sigmatrue = ssq;
                 
                 for k = 1:generatedData.K
-                
-%                     generatedData.Etrue(:,:,k) = mvnrnd(zeros(generatedData.I,generatedData.J)...
-%                         ,eye(generatedData.J)*ssq);%(k));
-% 
-                      generatedData.Etrue(:,:,k) = mvnrnd(zeros(generatedData.I,generatedData.J)...
+                    
+                    %                     generatedData.Etrue(:,:,k) = mvnrnd(zeros(generatedData.I,generatedData.J)...
+                    %                         ,eye(generatedData.J)*ssq);%(k));
+                    %
+                    generatedData.Etrue(:,:,k) = mvnrnd(zeros(generatedData.I,generatedData.J)...
                         ,eye(generatedData.J)*ssq(k));
-
+                    
                 end
                 
                 
-                generatedData.X = generatedData.Xtrue+generatedData.Etrue;
+                generatedData.Xunfolded = generatedData.Xtrue+generatedData.Etrue;
                 
             elseif strcmp(options.initMethod,'generative')
                 
