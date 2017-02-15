@@ -13,7 +13,8 @@ classdef varBayesModelParafac2 < handle
         util
         opts
         
-        CV_ELBOS
+        CV_ELBOS_test
+        CV_ELBOS_train
         % TODO: add statistics class
     end
     
@@ -66,12 +67,12 @@ classdef varBayesModelParafac2 < handle
         
         function crossValidateM(obj,Minterval)
             M = numel(Minterval);
-            obj.CV_ELBOS = zeros(M,obj.fullData.K);
             
-            T = 10;
+            T = 5;
             obj.cvRunsTest = cell(obj.fullData.K,T);
             obj.cvRunsTrain = cell(obj.fullData.K,T);
-            obj.CV_ELBOS = zeros(obj.fullData.K,T,M);
+            obj.CV_ELBOS_train = zeros(obj.fullData.K,T,M);
+            obj.CV_ELBOS_test = zeros(obj.fullData.K,T,T,M);
             for m = 1:M
                 
                 obj.dataTrain.M = Minterval(m);
@@ -87,13 +88,15 @@ classdef varBayesModelParafac2 < handle
                         obj.dataTrain.restartDataDiagnostics;
                         obj.fitTrainingData;
                         
-                        obj.dataTest.restartDataDiagnostics;
-                        obj.fitTestData;
-                        
-                        obj.cvRunsTest{k,t,m} = struct('qDist',obj.qDistTrain,'Data',obj.dataTrain);
                         obj.cvRunsTrain{k,t,m} = struct('qDist',obj.qDistTest,'Data',obj.dataTest);
+                        obj.CV_ELBOS_train(k,t,m) = obj.qDistTrain.ELBO;
                         
-                        obj.CV_ELBOS(k,t,m) = obj.qDistTest.ELBO;
+                        for tt = 1:T
+                        obj.dataTest.restartDataDiagnostics;
+                            obj.fitTestData;
+                            obj.cvRunsTest{k,t,tt,m} = struct('qDist',obj.qDistTrain,'Data',obj.dataTrain);
+                            obj.CV_ELBOS_test(k,t,tt,m) = obj.qDistTest.ELBO;
+                        end
                         %                         fprintf('\t[Fold: %f]\n',obj.CV_ELBOS(k,t,m))
                     end
                 end
@@ -487,13 +490,13 @@ classdef varBayesModelParafac2 < handle
             [~,sortedIdx] = sort(var(parameter));
         end
         
-        function generatedData = generateDataFromModel(options)
+        function generatedData = generateDataFromModel(dataSettings)
             
             % Init data
-            I = options.dimensions(1);
-            J = options.dimensions(2);
-            K = options.dimensions(3);
-            M = options.dimensions(4);
+            I = dataSettings.dimensions(1);
+            J = dataSettings.dimensions(2);
+            K = dataSettings.dimensions(3);
+            M = dataSettings.dimensions(4);
             
             generatedData = dataClass;
             
@@ -503,8 +506,8 @@ classdef varBayesModelParafac2 < handle
             
             generatedData.Atrue = mvnrnd(zeros(generatedData.I,generatedData.Mtrue),eye(generatedData.Mtrue));
             
-            if strcmp(options.initMethod,'kiers')
-                F = ones(M,M)*options.congruence;
+            if strcmp(dataSettings.initMethod,'kiers')
+                F = ones(M,M)*dataSettings.congruence;
                 
                 for m = 1:M
                     F(m,m) = 1;
@@ -535,41 +538,44 @@ classdef varBayesModelParafac2 < handle
                         generatedData.Ftrue'*generatedData.Ptrue(:,:,k)';
                 end
                 
-                %                   SNR = zeros(1,generatedData.K);
-                SNR = [repmat(0,1,generatedData.K)];
-                %                 SNR = [repmat(-20,1,5) zeros(1,generatedData.K-5)];
+                ssq = generatedData.computeNoiseLevel(generatedData,dataSettings.SNR);
                 
-                ssq = generatedData.computeNoiseLevel(generatedData,SNR);
+                if strcmp(dataSettings.noiseType,'hetero')
+                    pp=rand(1,generatedData.K);
+                elseif strcmp(dataSettings.noiseType,'homo')
+                    pp=ones(1,generatedData.K); 
+                end
+                
+                pp=pp/sum(pp)*generatedData.K;
                 
                 generatedData.Sigmatrue = ssq;
                 
                 for k = 1:generatedData.K
                     generatedData.Etrue(:,:,k) = mvnrnd(zeros(generatedData.I,generatedData.J)...
-                        ,eye(generatedData.J)*ssq(k));
+                        ,eye(generatedData.J)*ssq*pp(k));
                 end
+                
+%                 disp((norm(generatedData.Xtrue(:),'fro')^2/norm(generatedData.Etrue(:),'fro')^2))
+                
                 generatedData.Xunfolded = generatedData.Xtrue+generatedData.Etrue;
                 
-            elseif strcmp(options.initMethod,'generative')
+            elseif strcmp(dataSettings.initMethod,'generative')
                 
-                if ~isfield(options,'precision')
+                if ~isfield(dataSettings,'precision')
                     SigmaPrecision = 1e12;
                     AlphaPrecision = 1e-3;
                 else
-                    SigmaPrecision = options.precision(1);
-                    AlphaPrecision = options.precision(2);
+                    SigmaPrecision = dataSettings.precision(1);
+                    AlphaPrecision = dataSettings.precision(2);
                 end
                 
                 generatedData.Sigmatrue = repmat(SigmaPrecision,1,generatedData.K);
                 generatedData.Alphatrue = repmat(AlphaPrecision,1,generatedData.Mtrue);
                 
                 generatedData.Atrue = mvnrnd(zeros(generatedData.I,generatedData.Mtrue),eye(generatedData.Mtrue));
-                
                 generatedData.Ftrue = mvnrnd(zeros(generatedData.Mtrue,generatedData.Mtrue),eye(generatedData.Mtrue));
-                
                 generatedData.Ctrue = mvnrnd(zeros(generatedData.K,generatedData.Mtrue),diag(1./generatedData.Alphatrue));
-                
                 generatedData.Etrue = zeros(generatedData.I,generatedData.J,generatedData.K);
-                
                 generatedData.Ptrue = zeros(generatedData.J,generatedData.Mtrue,generatedData.K);
                 
                 for k = 1:generatedData.K

@@ -5,10 +5,11 @@ classdef optionsClass < handle
         % TODO: implement prompts
         debugFlag = 1; % debug level: 1. CAVI; 2. Updates;
         verbose = 1; % 1, display, 0 hide everything
-        tol = 1e-7;
+        tol = 1e-9;
         showIter = 500;
         maxIter = intmax;
         maxTime = realmax;
+        
         
         % qDist options (with default options)
         estimationARD ='max'; % max or avg

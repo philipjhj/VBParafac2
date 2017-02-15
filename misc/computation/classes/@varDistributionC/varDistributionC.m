@@ -272,6 +272,9 @@ classdef varDistributionC < handle
             if strcmp(obj.opts.estimationARD,'max')
                 obj.qAlphaMeanLog = 0;
             end
+            if strcmp(obj.opts.estimationP,'vonmises')
+                obj.qPMeanLog = 0;
+            end
         end
         
         function computeEntropyValues(obj,variationalFactorNames)

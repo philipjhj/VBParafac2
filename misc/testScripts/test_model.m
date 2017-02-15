@@ -8,9 +8,9 @@ warning off MATLAB:nearlySingularMatrix
 %%
 % myModel=varBayesModelParafac2;
 rng('default')
-I=100;
+I=150;
 J=I;
-K=10;
+K=30;
 M=4;
 Mesti = 10;
 
@@ -19,15 +19,23 @@ options.initMethod = 'kiers';
 % options.initMethod = 'generative';
 options.congruence = 0.4;
 % 1e4 1e-3 i ARD tests
-options.precision = [1e2 1e-6]; 
+options.precision = [1e2 1e-6];
+options.SNR = -12;
+options.noiseType = 'homo';
 % [1e4 1e-8] creates problems for qC
 
-% rng(4)
+% sumSNR = 0;
+% for k = 1:100
+% rng('shuffle')
+rng(1)
 data = varBayesModelParafac2.generateDataFromModel(options);
+% sumSNR = sumSNR+10*log10(norm(data.Xtrue(:),'fro')^2/norm(data.Etrue(:),'fro')^2);
+% end
+% sumSNR/100
 % data = permute(I1,[2 1 3]);
 %
 %
-
+%
 %normalModel = normalParafac2(data.X);
 % normalModel = normalParafac2(permute(I1,[2 1 3]));
 
@@ -56,7 +64,7 @@ myModel.opts.showIter = 1;
 % myModel.opts.maxIter = 50;
 
 myModel.opts.activeParams = {'qA','qF','qP','qC','qSigma','qAlpha'};
-
+%
 % myModel.partitionData(myModel.fullData.X)
 % tic
 % myModel.fitTrainingData;
@@ -64,7 +72,7 @@ myModel.opts.activeParams = {'qA','qF','qP','qC','qSigma','qAlpha'};
 
 % myModel.opts.activeParams = {'qA','qC','qP','qSigma','qF'};
 %%
-Ms = 2:8;
+Ms = 2:6;
 myModel.crossValidateM(Ms)
 %%
 
