@@ -8,11 +8,11 @@ warning off MATLAB:nearlySingularMatrix
 %%
 % myModel=varBayesModelParafac2;
 rng('default')
-I=20;
+I=100;
 J=I;
-K=20;
+K=10;
 M=4;
-Mesti = M;
+Mesti = 10;
 
 options.dimensions = [I J K M];
 options.initMethod = 'kiers';
@@ -22,7 +22,7 @@ options.congruence = 0.4;
 options.precision = [1e2 1e-6]; 
 % [1e4 1e-8] creates problems for qC
 
-rng(4)
+% rng(4)
 data = varBayesModelParafac2.generateDataFromModel(options);
 % data = permute(I1,[2 1 3]);
 %
@@ -37,45 +37,54 @@ data = varBayesModelParafac2.generateDataFromModel(options);
 %normalModel.Parafac2Fit(data.Xtrue)
 %
 rng('default')
-myModel=varBayesModelParafac2(data.Xunfolded,Mesti);
+myModel=varBayesModelParafac2(data,Mesti);
 
 % size(myModel.data.X)
 %
 % myModel=varBayesModelParafac2(Y,100);
 
-myModel.opts.verbose = 1;
-myModel.opts.debugFlag = 2;
+myModel.opts.verbose = 0;
+myModel.opts.debugFlag = 0;
 myModel.opts.estimationP= 'parafac2svd';
 % myModel.opts.estimationP = 'vonmises';
 myModel.opts.estimationARD = 'max';
 myModel.opts.estimationNoise = 'avg';
 myModel.opts.matrixProductPrSlab = 'mtimesx';
 myModel.opts.nActiveComponents = 'threshold';
-myModel.opts.showIter = 2;
-myModel.opts.rngInput = 7;
+myModel.opts.showIter = 1;
+% myModel.opts.rngInput = 7;
+% myModel.opts.maxIter = 50;
 
-% data set; rng(3)
-% seed; 1461191309
-% iter (avg); 441
-% iter (max); 44
+myModel.opts.activeParams = {'qA','qF','qP','qC','qSigma','qAlpha'};
 
-% myModel.opts.maxTime = 1;
+% myModel.partitionData(myModel.fullData.X)
+% tic
+% myModel.fitTrainingData;
+% toc
 
-%myModel.qDist.SNR
-% clc
-
-myModel.opts.activeParams = {'qA','qF','qP','qC','qAlpha','qSigma'};
 % myModel.opts.activeParams = {'qA','qC','qP','qSigma','qF'};
+%%
+Ms = 2:8;
+myModel.crossValidateM(Ms)
+%%
 
+%%
+best_ELBO_true = squeeze(mean(max(myModel.CV_ELBOS(:,:,3),[],2)));
+squeeze(mean(max(myModel.CV_ELBOS,[],2)))-best_ELBO_true
+(squeeze(mean(max(myModel.CV_ELBOS,[],2)))-best_ELBO_true)/best_ELBO_true
 
-% clc
-%
-% myModel.data.iter = myModel.data.iter-1;
-% myModel.restartqDist;
-% myModel.opts.maxTime = 5;
+%%
+best_ELBO_all = squeeze(mean(max(myModel.CV_ELBOS,[],2)));
+plot(Ms,best_ELBO_all,'o-')
+xlabel('# of components')
+ylabel('ELBO')
+grid on
+% figname=input('Write name of figure: ','s');
+% saveas(gcf,strcat('output/paper/temps/',figname,'.jpg'))
 
+%%
 tic
-myModel.fitTrainingData(15);
+myModel.fitTrainingData;
 toc
 %myModel.qDist.SNR
 % myModel.Parafac2Fit

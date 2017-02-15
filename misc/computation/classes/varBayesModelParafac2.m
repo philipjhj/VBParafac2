@@ -1,31 +1,34 @@
 classdef varBayesModelParafac2 < handle
-    
     properties
-        ELBO_chain
-        fit_chain
-        n_components
-        n_components_hard
-        evaltime
-        evaltime_cpu
-        
-        test_ELBO_chain
-        test_fit_chain
-        test_n_components
-        test_n_components_hard
-        test_evaltime
-        test_evaltime_cpu
-        
-        % Variational Distributions
         qDistTrain
         qDistTest
         
-        testData
-        trainData
+        fullData
+        dataTest
+        dataTrain
+        
+        cvRunsTest
+        cvRunsTrain
         
         util
-        
         opts
+        
+        CV_ELBOS
         % TODO: add statistics class
+    end
+    
+    properties (Access = protected)
+        currentPartition
+        currentData
+        currentqDist
+        
+        testParameters = {'qP','qC','qSigma'};
+        
+        ListenerPartitionUpdates
+    end
+    
+    events
+        partitionUpdate
     end
     
     properties (Dependent)
@@ -34,241 +37,257 @@ classdef varBayesModelParafac2 < handle
     end
     
     methods
-        
-        function value = get.n_neg_ELBO_diff(obj)
-            value = sum(diff(nonzeros(obj.ELBO_chain))<0);
+        function obj = varBayesModelParafac2(data,M)
+            obj.opts = optionsClass;
+            obj.util = utilitiesClass(obj);
+            
+            % TODO: Do not partition data here, gather full data first,
+            % and partition in CV methods
+            if isa(data,'double')
+                % If data matrix input
+                
+            elseif isa(data,'dataClass')
+                obj.fullData = data;
+                obj.fullData.M = M;
+            end
+            
+            obj.dataTrain = dataClass;
+            obj.dataTest = dataClass;
+            obj.dataTrain.M = M;
+            obj.dataTest.M = M;
+            obj.dataTrain.partitionName = 'Train';
+            obj.dataTest.partitionName = 'Test';
+            
+            obj.qDistTrain = varDistributionC(obj,obj.dataTrain);
+            obj.qDistTest = varDistributionC(obj,obj.dataTest);
+            
+            obj.ListenerPartitionUpdates = addlistener(obj,'partitionUpdate',@obj.setCurrentPartitionNames);
         end
         
-        function value = get.n_neg_ELBO_diff_idx(obj)
-            value = find(diff(nonzeros(obj.ELBO_chain))<0);
+        function crossValidateM(obj,Minterval)
+            M = numel(Minterval);
+            obj.CV_ELBOS = zeros(M,obj.fullData.K);
+            
+            T = 10;
+            obj.cvRunsTest = cell(obj.fullData.K,T);
+            obj.cvRunsTrain = cell(obj.fullData.K,T);
+            obj.CV_ELBOS = zeros(obj.fullData.K,T,M);
+            for m = 1:M
+                
+                obj.dataTrain.M = Minterval(m);
+                obj.dataTest.M = Minterval(m);
+                
+                
+                for k = 1:obj.fullData.K
+                    obj.partitionData(obj.fullData.X,k);
+                    
+                    for t = 1:T
+                        fprintf('[Start: %s]\t[M: %d/%d (=%d)]\t[Fold: %d/%d]\t[Initialization: %d/%d]\n',...
+                            datestr(datetime('now')),m,M,Minterval(m),k,obj.fullData.K,t,T)
+                        obj.dataTrain.restartDataDiagnostics;
+                        obj.fitTrainingData;
+                        
+                        obj.dataTest.restartDataDiagnostics;
+                        obj.fitTestData;
+                        
+                        obj.cvRunsTest{k,t,m} = struct('qDist',obj.qDistTrain,'Data',obj.dataTrain);
+                        obj.cvRunsTrain{k,t,m} = struct('qDist',obj.qDistTest,'Data',obj.dataTest);
+                        
+                        obj.CV_ELBOS(k,t,m) = obj.qDistTest.ELBO;
+                        %                         fprintf('\t[Fold: %f]\n',obj.CV_ELBOS(k,t,m))
+                    end
+                end
+            end
         end
         
-        function partitionData(obj,X)
-            disp('Partitioning data slices into 80% training set, 20% test set');
-            
-            testPct = 0;
-            
-            obj.trainData = dataClass;
-            obj.testData = dataClass;
-            
+        function partitionData(obj,X,testSlices)
             dims = size(X);
             K=dims(end);
             nPrSlice = prod(dims(1:(end-1)));
             
             allSlices = 1:K;
-            testSlices = randsample(K,floor(testPct*K));
+            
+            if nargin < 3
+                testPct = 0;
+                testSlices = randsample(K,floor(testPct*K));
+            end
             trainSlices = allSlices(~ismember(allSlices,testSlices));
             
             X = reshape(X,nPrSlice,K);
-            obj.testData.Xunfolded = reshape(X(:,testSlices),[dims(1:(end-1)) numel(testSlices)]);
-            obj.trainData.Xunfolded = reshape(X(:,trainSlices),[dims(1:(end-1)) numel(trainSlices)]);
+            obj.dataTest.Xunfolded = reshape(X(:,testSlices),[dims(1:(end-1)) numel(testSlices)]);
+            obj.dataTrain.Xunfolded = reshape(X(:,trainSlices),[dims(1:(end-1)) numel(trainSlices)]);
         end
         
-        function obj = varBayesModelParafac2(X,M)
-            obj.opts = optionsClass;
-            obj.util = utilitiesClass(obj);
-            
-            obj.opts.maxTime = realmax;
-            
-            
-            % Load given data set
-            obj.partitionData(X);
-            
-            obj.trainData.M = M;
-            obj.testData.M = M;
-            
-            % Create variational distribution object
-            obj.qDistTrain = varDistributionC(obj,obj.trainData);
-            obj.qDistTest = varDistributionC(obj,obj.testData);
-        end
-        
-        
-        function restartqDistTrain(obj)
-            clear obj.qDistTrain;
-            obj.qDistTrain = varDistributionC(obj);
-            obj.trainData.iter = 1;
-            
-            obj.ELBO_chain = [];
-            obj.fit_chain = [];
-            obj.n_components = [];
-            obj.n_components_hard = [];
-            obj.evaltime = [];
-            obj.evaltime_cpu = [];
+        % Necessary? If yes, move to qDist
+        function restartPartitions(obj)
+            %             clear obj.qDistTrain;
+            %             obj.qDistTrain = varDistributionC(obj);
+            %                     obj.dataTrain.iter = 1;
+            %
+            %
             
         end
         
-        function fitTrainingData(obj,maxiter)
-            [obj.qDistTrain,obj.trainData]=obj.computeVarDistribution(maxiter,obj.qDistTrain,obj.trainData);
+        function set.currentPartition(obj,name)
+            obj.currentPartition = name;
+            notify(obj,'partitionUpdate');
+        end
+        function setCurrentPartitionNames(obj,~,~)
+            obj.currentData = strcat('data',obj.currentPartition);
+            obj.currentqDist = strcat('qDist',obj.currentPartition);
         end
         
-        function fitTestData(obj,maxiter)
-            previous_opt = obj.opts.activeParams;
-            obj.opts.activeParams = {'qP','qC','qSigma'};
+        function fitTrainingData(obj)
+            obj.currentPartition = obj.dataTrain.partitionName;
+            
+            rng(obj.opts.rngInput);
+            obj.qDistTrain.initializeVariationalDististribution;
+            
+            obj.computeVarDistribution;
+        end
+        function fitTestData(obj)
+            obj.currentPartition = obj.dataTest.partitionName;
+            
+            obj.qDistTest.initializeVariationalDististribution;
+            
+            trainParameters = obj.opts.activeParams;
+            
+            obj.opts.activeParams = obj.testParameters(ismember(obj.testParameters,obj.opts.activeParams));
+            
             obj.qDistTest.qA = obj.qDistTrain.qA;
             obj.qDistTest.qF = obj.qDistTrain.qF;
-            [obj.qDistTest,obj.testData]=obj.computeVarDistribution(maxiter,obj.qDistTest,obj.testData);
-            obj.opts.activeParams = previous_opt;
+            obj.qDistTest.qAlpha = obj.qDistTrain.qAlpha;
+            
+            obj.computeVarDistribution;
+            obj.opts.activeParams = trainParameters;
         end
         
-        function [qDist,data,stopReason,errorStatus] = computeVarDistribution(obj,maxiter,qDist,data)
-            
-            if obj.opts.verbose
-                disp('Starting CAVI with:')
-                disp(qDist.opts.activeParams)
-                %             disp('\n')
-            end
-            
-            % Set options and meta data
-            if nargin < 2
-                obj.opts.maxiter = intmax;
-            elseif isempty(obj.opts.maxiter) || obj.opts.maxiter < maxiter
-                obj.opts.maxiter = maxiter;
-            end
-            
+        function [stopReason,errorStatus] = computeVarDistribution(obj)
             stopReason = 0;
             errorStatus = 0;
             
-            if isempty(data.iter)
-                data.iter = 1;
+            if obj.opts.verbose
+                disp('Starting CAVI with:')
+                disp(obj.(obj.currentqDist).opts.activeParams)
             end
-            
-            
-            % Initialize on first iteration
-            if data.iter == 1
-                rng(obj.opts.rngInput);
-                qDist = qDist.initializeVariationalDististribution;
-                
-                obj.n_components(1) = qDist.nActiveComponents;
-                obj.n_components_hard(1) = qDist.nActiveComponents('hard');
-                obj.evaltime(1) = 1e-10;
-                obj.evaltime_cpu(1) = 1e-10;
-            end
-            
-            startTime = obj.evaltime(obj.evaltime==max(obj.evaltime));
-            startTime_cpu = obj.evaltime_cpu(obj.evaltime_cpu==max(obj.evaltime_cpu));
-            
-            % Compute Initial ELBO
-            ELBO = qDist.ELBO;
-            ELBO_prev = 0;
-            diff = ELBO-ELBO_prev;
             
             if obj.opts.verbose
                 obj.displayHeader;
             end
             
-            % Update Variational Factors until ELBO has converged
-            ticCAVI=tic;
-            t_CAVI_cpu = cputime;
-            while abs(diff)/abs(ELBO) > obj.opts.tol && obj.opts.maxiter+1 > data.iter...
-                    && obj.opts.maxTime > obj.evaltime(obj.evaltime==max(obj.evaltime))
+            obj.initializeCAVI;
+            obj.(obj.currentData).computeStartTimes;
+            
+            obj.(obj.currentData).ELBO = obj.(obj.currentqDist).ELBO;
+            
+            obj.(obj.currentData).ticCAVIwall = tic;
+            obj.(obj.currentData).ticCAVIcpu = cputime;
+            while obj.checkIfNotConvergenced
+                obj.(obj.currentqDist).updateMoments;
+                obj.(obj.currentData).ELBO = obj.(obj.currentqDist).ELBO;
                 
-                % Update active (see options) variational factors
-                qDist.updateMoments;
+                obj.storeDiagnostics;
+                obj.debugCheckELBOconvergence;
+                obj.displayResultsAll;
                 
-                
-                % Compute ELBO
-                ELBO_prev = ELBO;
-                ELBO = qDist.ELBO;
-                
-                diff = ELBO-ELBO_prev;
-                
-                % Store progress information
-                if isempty(obj.ELBO_chain) || numel(obj.ELBO_chain)<data.iter+1
-                    obj.ELBO_chain = [obj.ELBO_chain zeros(1,100)];
-                    obj.fit_chain = [obj.fit_chain zeros(1,100)];
-                    obj.evaltime = [obj.evaltime zeros(1,100)];
-                    obj.evaltime_cpu = [obj.evaltime_cpu zeros(1,100)];
-                    obj.n_components = [obj.n_components zeros(1,100)];
-                    obj.n_components_hard = [obj.n_components_hard zeros(1,100)];
-                end
-                obj.ELBO_chain(data.iter) = ELBO;
-                obj.fit_chain(data.iter) = obj.Parafac2Fit(qDist);
-                obj.evaltime(data.iter) = toc(ticCAVI)+startTime;
-                obj.evaltime_cpu(data.iter) = cputime-t_CAVI_cpu+startTime_cpu;
-                obj.n_components(data.iter) = qDist.nActiveComponents;
-                obj.n_components_hard(data.iter) = qDist.nActiveComponents('hard');
-                
-                % Check convergence
-                if obj.opts.debugFlag >= 1 && diff/abs(ELBO) < -1e-7 && data.iter>0
-                    warning('off','backtrace')
-                    warning('At iter %d ELBO not converging; relativ diff. is %.10f, diff; %.4f \n',...
-                        data.iter,diff/abs(ELBO),diff)
-                    warning('on','backtrace')
-                    %                     keyboard
-                    errorStatus=-1;
-                    fprintf('%5d',data.iter);
-                    obj.displayResultsAll(diff,qDist);
-                    %                     break
-                end
-                
-                
-                
-                % Display Progress
-                if obj.opts.verbose && data.iter ~= 0 && mod(data.iter,obj.opts.showIter) == 0
-                    
-                    % Output progress
-                    % ...
-                    fprintf('%5d',data.iter);
-                    obj.displayResultsAll(diff,qDist);
-                end
-                
-                if obj.Parafac2Fit(qDist)/100>=1%(1-obj.opts.tol)
-                    break;
-                end
-                
-                data.iter = data.iter+1;
+                obj.(obj.currentData).iter = obj.(obj.currentData).iter+1;
             end
             
             if obj.opts.verbose
                 obj.displayHeader;
-                fprintf('\n\n');
-                
             end
             
-            % Stop Criteria Message
+            obj.printStopReason;
+            obj.cleanUp;
+        end
+        
+        function initializeCAVI(obj)
+            if obj.(obj.currentData).iter == 1
+                obj.(obj.currentData).n_components(1) = obj.(obj.currentqDist).nActiveComponents;
+                obj.(obj.currentData).n_components_hard(1) = obj.(obj.currentqDist).nActiveComponents('hard');
+                obj.(obj.currentData).evaltime(1) = 1e-10;
+                obj.(obj.currentData).evaltime_cpu(1) = 1e-10;
+            end
+        end
+        function bool = checkIfNotConvergenced(obj)
+            bool = abs(obj.(obj.currentData).ELBO_diff)/abs(obj.(obj.currentData).ELBO) > obj.opts.tol && ...
+                obj.opts.maxIter+1 > obj.(obj.currentData).iter && ...
+                obj.opts.maxTime > obj.(obj.currentData).getLatestEvalTime;
+        end
+        
+        function storeDiagnostics(obj)
+            % Store progress information
+            if isempty(obj.(obj.currentData).ELBO_chain) || numel(obj.(obj.currentData).ELBO_chain)<obj.(obj.currentData).iter+1
+                obj.(obj.currentData).ELBO_chain = [obj.(obj.currentData).ELBO_chain zeros(1,100)];
+                obj.(obj.currentData).fit_chain = [obj.(obj.currentData).fit_chain zeros(1,100)];
+                obj.(obj.currentData).evaltime = [obj.(obj.currentData).evaltime zeros(1,100)];
+                obj.(obj.currentData).evaltime_cpu = [obj.(obj.currentData).evaltime_cpu zeros(1,100)];
+                obj.(obj.currentData).n_components = [obj.(obj.currentData).n_components zeros(1,100)];
+                obj.(obj.currentData).n_components_hard = [obj.(obj.currentData).n_components_hard zeros(1,100)];
+            end
+            obj.(obj.currentData).ELBO_chain(obj.(obj.currentData).iter) = obj.(obj.currentData).ELBO;
+            obj.(obj.currentData).fit_chain(obj.(obj.currentData).iter) = obj.Parafac2Fit(obj.(obj.currentqDist));
+            obj.(obj.currentData).evaltime(obj.(obj.currentData).iter) = toc(obj.(obj.currentData).ticCAVIwall)+obj.(obj.currentData).startWallTime;
+            %             obj.(obj.currentData).evaltime_cpu(obj.(obj.currentData).iter) = cputime-obj.(obj.currentData).ticCAVIcpu+obj.(obj.currentData).startCpuTime;
+            obj.(obj.currentData).n_components(obj.(obj.currentData).iter) = obj.(obj.currentqDist).nActiveComponents;
+            obj.(obj.currentData).n_components_hard(obj.(obj.currentData).iter) = obj.(obj.currentqDist).nActiveComponents('hard');
+        end
+        
+        function debugCheckELBOconvergence(obj)
+            if obj.opts.debugFlag >= 1 && obj.(obj.currentData).ELBO_diff/abs(obj.(obj.currentData).ELBO) < -1e-7 && obj.(obj.currentData).iter>0
+                warning('off','backtrace')
+                warning('At iter %d ELBO not converging; relativ diff. is %.10f, diff; %.4f \n',...
+                    obj.(obj.currentData).iter,obj.(obj.currentData).ELBO_diff/abs(obj.(obj.currentData).ELBO),obj.(obj.currentData).ELBO_diff)
+                warning('on','backtrace')
+                
+                fprintf('%5d',obj.(obj.currentData).iter);
+                %                 obj.displayResultsAll(obj.(obj.currentData).ELBO_diff,obj.(obj.currentqDist));
+            end
+        end
+        function printStopReason(obj)
             if obj.opts.verbose
-                if diff/abs(ELBO) < obj.opts.tol
-                    fprintf('CAVI has converged with last change %f\n', abs(diff)/abs(ELBO))
-                    stopReason = 1;
-                elseif obj.opts.maxiter <= data.iter
-                    fprintf('CAVI has stopped at iteration %d (max iteration) with change %f\n',data.iter-1,abs(diff)/abs(ELBO))
-                    stopReason = 2;
-                elseif obj.opts.maxTime <= obj.evaltime(obj.evaltime==max(obj.evaltime))
-                    fprintf('CAVI has stopped after %f s. evaluation (max time) with change %f\n',obj.evaltime(obj.evaltime==max(obj.evaltime)),abs(diff)/abs(ELBO))
-                    stopReason = 3;
-                elseif obj.Parafac2Fit(qDist)/100>(1-obj.opts.tol)
-                    fprintf('CAVI has stopped with a fit of %f %% with change %f\n',obj.Parafac2Fit(qDist),abs(diff)/abs(ELBO))
-                    stopReason = 4;
+                if obj.(obj.currentData).ELBO_diff/abs(obj.(obj.currentData).ELBO) < obj.opts.tol
+                    fprintf('CAVI has converged with last change %f\n', abs(obj.(obj.currentData).ELBO_diff)/abs(obj.(obj.currentData).ELBO))
+                    %                     stopReason = 1;
+                elseif obj.opts.maxIter <= obj.(obj.currentData).iter
+                    fprintf('CAVI has stopped at iteration %d (max iteration) with change %f\n',obj.(obj.currentData).iter-1,abs(obj.(obj.currentData).ELBO_diff)/abs(obj.(obj.currentData).ELBO))
+                    %                     stopReason = 2;
+                elseif obj.opts.maxTime <= obj.(obj.currentData).evaltime(obj.evaltime==max(obj.(obj.currentData).evaltime))
+                    fprintf('CAVI has stopped after %f s. evaluation (max time) with change %f\n',obj.(obj.currentData).evaltime(obj.(obj.currentData).evaltime==max(obj.(obj.currentData).evaltime)),abs(obj.(obj.currentData).ELBO_diff)/abs(obj.(obj.currentData).ELBO))
+                    %                     stopReason = 3;
+                elseif obj.Parafac2Fit(obj.(obj.currentqDist))/100>(1-obj.opts.tol)
+                    fprintf('CAVI has stopped with a fit of %f %% with change %f\n',obj.Parafac2Fit(obj.(obj.currentqDist)),abs(obj.(obj.currentData).ELBO_diff)/abs(obj.(obj.currentData).ELBO))
+                    %                     stopReason = 4;
                 end
-                
             end
-            
+        end
+        function cleanUp(obj)
             % Trim preallocated memory
-            obj.ELBO_chain = nonzeros(obj.ELBO_chain)';
-            obj.fit_chain = nonzeros(obj.fit_chain)';
-            obj.evaltime = nonzeros(obj.evaltime)';
-            obj.evaltime_cpu = nonzeros(obj.evaltime_cpu)';
-            obj.n_components = nonzeros(obj.n_components)';
-            obj.n_components_hard = nonzeros(obj.n_components_hard)';
+            obj.(obj.currentData).ELBO_chain = nonzeros(obj.(obj.currentData).ELBO_chain)';
+            obj.(obj.currentData).fit_chain = nonzeros(obj.(obj.currentData).fit_chain)';
+            obj.(obj.currentData).evaltime = nonzeros(obj.(obj.currentData).evaltime)';
+            obj.(obj.currentData).evaltime_cpu = nonzeros(obj.(obj.currentData).evaltime_cpu)';
+            obj.(obj.currentData).n_components = nonzeros(obj.(obj.currentData).n_components)';
+            obj.(obj.currentData).n_components_hard = nonzeros(obj.(obj.currentData).n_components_hard)';
             
             % Gather results to CPU
             if strcmpi(obj.opts.matrixProductPrSlab,'gpu')
-                qDist.qA.mean = gather(qDist.qA.mean);
-                qDist.qA.variance = gather(qDist.qA.variance);
-                qDist.qC.mean = gather(qDist.qC.mean);
-                qDist.qC.variance = gather(qDist.qC.variance);
-                qDist.qF.mean = gather(qDist.qF.mean);
-                qDist.qF.variance = gather(qDist.qF.variance);
-                qDist.qP.mean = gather(qDist.qP.mean);
-                qDist.qP.variance = gather(qDist.qP.variance);
-
-                qDist.qSigma.alpha = gather(qDist.qSigma.alpha);
-                qDist.qSigma.beta= gather(qDist.qSigma.beta);
-                qDist.qAlpha.alpha = gather(qDist.qAlpha.alpha);
-                qDist.qAlpha.beta= gather(qDist.qAlpha.beta);
+                obj.(obj.currentqDist).qA.mean = gather(obj.(obj.currentqDist).qA.mean);
+                obj.(obj.currentqDist).qA.variance = gather(obj.(obj.currentqDist).qA.variance);
+                obj.(obj.currentqDist).qC.mean = gather(obj.(obj.currentqDist).qC.mean);
+                obj.(obj.currentqDist).qC.variance = gather(obj.(obj.currentqDist).qC.variance);
+                obj.(obj.currentqDist).qF.mean = gather(obj.(obj.currentqDist).qF.mean);
+                obj.(obj.currentqDist).qF.variance = gather(obj.(obj.currentqDist).qF.variance);
+                obj.(obj.currentqDist).qP.mean = gather(obj.(obj.currentqDist).qP.mean);
+                obj.(obj.currentqDist).qP.variance = gather(obj.(obj.currentqDist).qP.variance);
+                obj.(obj.currentqDist).qSigma.alpha = gather(obj.(obj.currentqDist).qSigma.alpha);
+                obj.(obj.currentqDist).qSigma.beta= gather(obj.(obj.currentqDist).qSigma.beta);
+                obj.(obj.currentqDist).qAlpha.alpha = gather(obj.(obj.currentqDist).qAlpha.alpha);
+                obj.(obj.currentqDist).qAlpha.beta= gather(obj.(obj.currentqDist).qAlpha.beta);
             end
         end
         
+        % TODO: refactor all code below!
         
         function displayHeader(obj)
             %'ELBO','ePxz','eQz'
@@ -280,9 +299,8 @@ classdef varBayesModelParafac2 < handle
                 fprintf('%10s',names{i})
             end
             fprintf('\n');
+            fprintf('\n\n');
         end
-        
-        
         function displayResults(obj,qDist)
             
             %             disp(repmat('*',1,20))
@@ -299,29 +317,18 @@ classdef varBayesModelParafac2 < handle
             fprintf('\n')
             
         end
-        
-        function displayResultsAll(obj,diff,qDist)
-            
-            %             disp(repmat('*',1,20))
-            %             fprintf('ELBO: %f \n',obj.qDistTrain.ELBO);
-            %             fprintf('ePxz: %f \n',obj.qDistTrain.ePxz);
-            %             fprintf('eQz: %f \n',obj.qDistTrain.eQz);
-            %                   obj.qDistTrain.ELBO,obj.qDistTrain.ePxz,obj.qDistTrain.eQz,...
-            ELBO = obj.ELBO_chain(qDist.data.iter);
-            fprintf('%10d',obj.n_components(qDist.data.iter),obj.n_components_hard(qDist.data.iter));
-            fprintf('%10.2e',...
-                diff,...
-                ELBO,obj.fit_chain(qDist.data.iter));
-            %                 obj.qDistTrain.qXMeanLog,obj.qDistTrain.qAMeanLog,obj.qDistTrain.qCMeanLog,...
-            %                 obj.qDistTrain.qFMeanLog,obj.qDistTrain.qPMeanLog,obj.qDistTrain.qSigmaMeanLog,...
-            %                 obj.qDistTrain.qAlphaMeanLog,obj.qDistTrain.qAEntropy,obj.qDistTrain.qCEntropy,...
-            %                 obj.qDistTrain.qFEntropy,obj.qDistTrain.qPEntropy,obj.qDistTrain.qSigmaEntropy,...
-            %                 obj.qDistTrain.qAlphaEntropy)
-            fprintf('\n')
-            
+        function displayResultsAll(obj)
+            if obj.opts.verbose && obj.(obj.currentData).iter ~= 0 && mod(obj.(obj.currentData).iter,obj.opts.showIter) == 0
+                qDist = obj.(obj.currentqDist);
+                fprintf('%5d',obj.(obj.currentData).iter);
+                ELBO = qDist.data.ELBO_chain(qDist.data.iter);
+                fprintf('%10d',qDist.data.n_components(qDist.data.iter),qDist.data.n_components_hard(qDist.data.iter));
+                fprintf('%10.2e',...
+                    obj.(obj.currentData).ELBO_diff,...
+                    ELBO,qDist.data.fit_chain(qDist.data.iter));
+                fprintf('\n')
+            end
         end
-        
-        
         
         function obj = compute_reconstruction(obj)
             
@@ -378,8 +385,6 @@ classdef varBayesModelParafac2 < handle
             
             
         end
-        
-        
         function plotSolutionRealMatrixK(obj,k)
             xRecon = obj.qDistTrain.qA.mean*diag(obj.qDistTrain.qC.mean(k,:))*obj.qDistTrain.qF.mean'*obj.qDistTrain.qP.mean(:,:,k)';
             
@@ -396,7 +401,6 @@ classdef varBayesModelParafac2 < handle
             avgError=sum(sum((obj.data.X(:,:,k)-xRecon)./abs(obj.data.X(:,:,k))))/numel(xRecon);
             fprintf('Avg. Error on relative estimate: %f\n',avgError)
         end
-        
         function plotSolutionReal3D(obj,k,m,mask)
             set(0,'DefaultFigureWindowStyle','docked')
             %             sortedAIDX = obj.sortComponents(obj.qDistTrain.qA.mean);
@@ -409,8 +413,6 @@ classdef varBayesModelParafac2 < handle
             
             plotComponent(U,V', mask, [ 53    63    46])
         end
-        %
-        
         function plotELBO(obj,plotinterval)
             % Trim preallocated memory
             obj.ELBO_chain = nonzeros(obj.ELBO_chain)';
@@ -440,7 +442,6 @@ classdef varBayesModelParafac2 < handle
             ylabel('N active components')
             title('Number of active components (red=true)')
         end
-        
         function plotHinton(obj)
             set(0,'DefaultFigureWindowStyle','normal')
             H = hinton(obj.qDistTrain.qC.mean);% ones(obj.data.K,obj.data.M));
@@ -463,12 +464,19 @@ classdef varBayesModelParafac2 < handle
             fit_true=gather((1-sum_res/norm(qDist.data.Xtrue(:))^2)*100);
             
         end
-        
-        
         function value = SNR(obj,qDist)
             value = norm(qDist.data.Xtrue(:))^2/norm(qDist.data.Etrue(:))^2;
             disp((sum(1./qDist.data.Alphatrue))/(1/qDist.data.Sigmatrue(1)))
             disp(value)
+        end
+        
+        
+        
+        function value = get.n_neg_ELBO_diff(obj)
+            value = sum(diff(nonzeros(obj.ELBO_chain))<0);
+        end
+        function value = get.n_neg_ELBO_diff_idx(obj)
+            value = find(diff(nonzeros(obj.ELBO_chain))<0);
         end
         
     end
@@ -478,15 +486,6 @@ classdef varBayesModelParafac2 < handle
         function sortedIdx = sortComponents(parameter)
             [~,sortedIdx] = sort(var(parameter));
         end
-        
-        %function obj = loadobj(obj)
-        %             if obj.data.I>1e4
-        %m=matfile('/media/data/DataAndResults/Thesis/motor_normalized_all_subs.mat');
-        %obj.data.X = m.Y;
-        %                 obj.qDistTrain.compute_eAiDFtPtPFDAi;
-        %             end
-        %end
-        
         
         function generatedData = generateDataFromModel(options)
             
@@ -527,48 +526,27 @@ classdef varBayesModelParafac2 < handle
                 end
                 
                 generatedData.Ctrue = 30*C;
-                
                 generatedData.Ptrue = zeros(generatedData.J,generatedData.Mtrue,generatedData.K);
-                
                 generatedData.Etrue = zeros(I,J,K);
                 
-                
-                
-                
-                
-                
-                
                 for k = 1:generatedData.K
-                    
                     generatedData.Ptrue(:,:,k) = orth(mvnrnd(zeros(generatedData.J,generatedData.Mtrue),eye(generatedData.Mtrue)));
-                    
-                    
-                    
                     generatedData.Xtrue(:,:,k) = generatedData.Atrue*diag(generatedData.Ctrue(k,:))*...
                         generatedData.Ftrue'*generatedData.Ptrue(:,:,k)';
-                    
-                    
                 end
                 
-                %                 SNR = linspace(-4,0,generatedData.K);
-                SNR = [repmat(-20,1,5) zeros(1,generatedData.K-5)];
-                
+                %                   SNR = zeros(1,generatedData.K);
+                SNR = [repmat(0,1,generatedData.K)];
+                %                 SNR = [repmat(-20,1,5) zeros(1,generatedData.K-5)];
                 
                 ssq = generatedData.computeNoiseLevel(generatedData,SNR);
                 
                 generatedData.Sigmatrue = ssq;
                 
                 for k = 1:generatedData.K
-                    
-                    %                     generatedData.Etrue(:,:,k) = mvnrnd(zeros(generatedData.I,generatedData.J)...
-                    %                         ,eye(generatedData.J)*ssq);%(k));
-                    %
                     generatedData.Etrue(:,:,k) = mvnrnd(zeros(generatedData.I,generatedData.J)...
                         ,eye(generatedData.J)*ssq(k));
-                    
                 end
-                
-                
                 generatedData.Xunfolded = generatedData.Xtrue+generatedData.Etrue;
                 
             elseif strcmp(options.initMethod,'generative')
@@ -612,5 +590,3 @@ classdef varBayesModelParafac2 < handle
         end
     end
 end
-
-
