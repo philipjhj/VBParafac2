@@ -5,9 +5,11 @@ datasets = {'Apple','Aroma','Cheese','Wine'};
 dimArray = zeros(1,3);
     k=0;
 
-for i = 1:4
+    testDir = '/media/data/DataAndResults/Thesis/output/results/results_RealData_tests/';
     
-    testDir = '/media/data/DataAndResults/Thesis/output/results/results_RealData_tests/'
+for i = 1
+    
+    
     
     mydir=strcat('/media/data/DataAndResults/Thesis/data/dataBro/Models and data/',datasets{i},' data/');
     files=dir(mydir);
@@ -27,7 +29,7 @@ for i = 1:4
             eval(strcat('I_dim=size(I',I_no{1},');'))
             
             
-            dimArray = dimArray + I_dim;
+            dimArray = dimArray + I_dim
             k=k+1;
             %         filepath = strcat(mydir,file.name);
             %         m = matfile(filepath);

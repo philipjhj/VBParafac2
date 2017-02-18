@@ -15,8 +15,8 @@ classdef GammaDist < probabilityDist
             end
             obj@probabilityDist(varname,type,arrayDim);
             
-            obj.alpha = 2*ones(obj.arrayDim);
-            obj.beta = 1/2*ones(obj.arrayDim);
+            obj.alpha = 1e-6*ones(obj.arrayDim); %2*ones(obj.arrayDim);
+            obj.beta = 1e6*ones(obj.arrayDim);% 1/2*ones(obj.arrayDim);
             
         end
         

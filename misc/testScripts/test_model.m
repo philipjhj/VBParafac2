@@ -29,10 +29,13 @@ options.noiseType = 'homo';
 % rng('shuffle')
 rng(1)
 data = varBayesModelParafac2.generateDataFromModel(options);
+
+%
 % sumSNR = sumSNR+10*log10(norm(data.Xtrue(:),'fro')^2/norm(data.Etrue(:),'fro')^2);
 % end
 % sumSNR/100
-% data = permute(I1,[2 1 3]);
+% I2 = I2/(norm(I2(:),'fro')/numel(I2));
+% data.X = permute(I2,[2 1 3]);
 %
 %
 %
@@ -46,12 +49,12 @@ data = varBayesModelParafac2.generateDataFromModel(options);
 %
 rng('default')
 myModel=varBayesModelParafac2(data,Mesti);
-
+%
 % size(myModel.data.X)
 %
 % myModel=varBayesModelParafac2(Y,100);
 
-myModel.opts.verbose = 0;
+myModel.opts.verbose = 1;
 myModel.opts.debugFlag = 0;
 myModel.opts.estimationP= 'parafac2svd';
 % myModel.opts.estimationP = 'vonmises';
@@ -60,14 +63,14 @@ myModel.opts.estimationNoise = 'avg';
 myModel.opts.matrixProductPrSlab = 'mtimesx';
 myModel.opts.nActiveComponents = 'threshold';
 myModel.opts.showIter = 1;
-% myModel.opts.rngInput = 7;
+myModel.opts.rngInput = 7;
 % myModel.opts.maxIter = 50;
 
 myModel.opts.activeParams = {'qA','qF','qP','qC','qSigma','qAlpha'};
 %
-% myModel.partitionData(myModel.fullData.X)
+myModel.partitionData(myModel.fullData.X)
 % tic
-% myModel.fitTrainingData;
+myModel.fitTrainingData;
 % toc
 
 % myModel.opts.activeParams = {'qA','qC','qP','qSigma','qF'};

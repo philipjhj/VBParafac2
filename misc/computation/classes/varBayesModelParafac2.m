@@ -154,6 +154,8 @@ classdef varBayesModelParafac2 < handle
             rng(obj.opts.rngInput);
             obj.qDistTrain.initializeVariationalDististribution;
             
+            obj.qDistTrain.qAlpha.mean = 1e-12*ones(1,obj.dataTrain.M);
+            
             obj.computeVarDistribution;
         end
         function fitTestData(obj)
