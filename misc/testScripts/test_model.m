@@ -72,7 +72,7 @@ myModel.opts.activeParams = {'qA','qF','qP','qC','qSigma','qAlpha'};
 
 % myModel.opts.activeParams = {'qA','qC','qP','qSigma','qF'};
 %%
-Ms = 2:6;
+Ms = 2:2;
 myModel.crossValidateM(Ms)
 %%
 

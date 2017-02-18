@@ -69,10 +69,10 @@ classdef varBayesModelParafac2 < handle
             M = numel(Minterval);
             
             T = 5;
-            obj.cvRunsTest = cell(obj.fullData.K,T);
-            obj.cvRunsTrain = cell(obj.fullData.K,T);
+            obj.cvRunsTest = cell(obj.fullData.K,T,M);
+            obj.cvRunsTrain = cell(obj.fullData.K,T,M);
             obj.CV_ELBOS_train = zeros(obj.fullData.K,T,M);
-            obj.CV_ELBOS_test = zeros(obj.fullData.K,T,T,M);
+            obj.CV_ELBOS_test = zeros(obj.fullData.K,T,M);
             for m = 1:M
                 
                 obj.dataTrain.M = Minterval(m);
@@ -81,25 +81,33 @@ classdef varBayesModelParafac2 < handle
                 
                 for k = 1:obj.fullData.K
                     obj.partitionData(obj.fullData.X,k);
-                    
+                    fprintf('[Start: %s]\t[M: %d]\t[Fold: %d/%d]\n',...
+                            datestr(datetime('now')),Minterval(m),k,obj.fullData.K)
+                    % init train T times
                     for t = 1:T
-                        fprintf('[Start: %s]\t[M: %d/%d (=%d)]\t[Fold: %d/%d]\t[Initialization: %d/%d]\n',...
-                            datestr(datetime('now')),m,M,Minterval(m),k,obj.fullData.K,t,T)
+%                         fprintf('[Train initialization: %d/%d]\n',t,T);
                         obj.dataTrain.restartDataDiagnostics;
                         obj.fitTrainingData;
                         
-                        obj.cvRunsTrain{k,t,m} = struct('qDist',obj.qDistTest,'Data',obj.dataTest);
+                        obj.cvRunsTrain{k,t,m} = struct('qDist',obj.qDistTrain,'Data',obj.dataTrain);
                         obj.CV_ELBOS_train(k,t,m) = obj.qDistTrain.ELBO;
-                        
-                        for tt = 1:T
-                        obj.dataTest.restartDataDiagnostics;
-                            obj.fitTestData;
-                            obj.cvRunsTest{k,t,tt,m} = struct('qDist',obj.qDistTrain,'Data',obj.dataTrain);
-                            obj.CV_ELBOS_test(k,t,tt,m) = obj.qDistTest.ELBO;
-                        end
-                        %                         fprintf('\t[Fold: %f]\n',obj.CV_ELBOS(k,t,m))
                     end
+                    
+                    [~,ind]=max(obj.CV_ELBOS_train(k,:,m));
+                    
+                    obj.qDistTrain = obj.cvRunsTrain{k,ind,m}.qDist;
+                    
+                    % init test T times
+                    for t = 1:T
+%                         fprintf('[Test initialization: %d/%d]\n',t,T);
+                        obj.dataTest.restartDataDiagnostics;
+                        obj.fitTestData;
+                        obj.cvRunsTest{k,t,m} = struct('qDist',obj.qDistTest,'Data',obj.dataTest);
+                        obj.CV_ELBOS_test(k,t,m) = obj.qDistTest.ELBO;
+                    end
+                    %                         fprintf('\t[Fold: %f]\n',obj.CV_ELBOS(k,t,m))
                 end
+                
             end
         end
         
