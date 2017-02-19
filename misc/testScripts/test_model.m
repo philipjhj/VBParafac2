@@ -1,14 +1,14 @@
 %load('/media/data/DataAndResults/Thesis/motor_normalized_all_subs.mat')
 % set_wd(2)
 % set(0,'DefaultFigureWindowStyle','docked')
-%load('/media/data/DataAndResults/Thesis/data/dataBro/Models and data/Apple data/Int2.mat')
+load('/media/data/DataAndResults/Thesis/data/dataBro/Models and data/Apple data/Int2.mat')
 %%
 
 warning off MATLAB:nearlySingularMatrix
 %%
 % myModel=varBayesModelParafac2;
 rng('default')
-I=150;
+I=50;
 J=I;
 K=30;
 M=4;
@@ -20,7 +20,7 @@ options.initMethod = 'kiers';
 options.congruence = 0.4;
 % 1e4 1e-3 i ARD tests
 options.precision = [1e2 1e-6];
-options.SNR = -12;
+options.SNR = -5;
 options.noiseType = 'homo';
 % [1e4 1e-8] creates problems for qC
 
@@ -64,9 +64,10 @@ myModel.opts.matrixProductPrSlab = 'mtimesx';
 myModel.opts.nActiveComponents = 'threshold';
 myModel.opts.showIter = 1;
 myModel.opts.rngInput = 7;
-% myModel.opts.maxIter = 50;
+myModel.opts.maxIter = 5000;
+% myModel.opts.maxTime = 4;
 
-myModel.opts.activeParams = {'qA','qF','qP','qC','qSigma','qAlpha'};
+myModel.opts.activeParams = {'qA','qF','qP','qC','qAlpha','qSigma'};
 %
 myModel.partitionData(myModel.fullData.X)
 % tic
@@ -75,7 +76,7 @@ myModel.fitTrainingData;
 
 % myModel.opts.activeParams = {'qA','qC','qP','qSigma','qF'};
 %%
-Ms = 2:2;
+Ms = 2:2
 myModel.crossValidateM(Ms)
 %%
 
@@ -100,8 +101,8 @@ toc
 %myModel.qDist.SNR
 % myModel.Parafac2Fit
 %%
-return
-for k=1:myModel.data.K
+% return
+for k=1:myModel.fullData.K
     
 clf
 

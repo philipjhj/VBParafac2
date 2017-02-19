@@ -154,8 +154,6 @@ classdef varBayesModelParafac2 < handle
             rng(obj.opts.rngInput);
             obj.qDistTrain.initializeVariationalDististribution;
             
-            obj.qDistTrain.qAlpha.mean = 1e-12*ones(1,obj.dataTrain.M);
-            
             obj.computeVarDistribution;
         end
         function fitTestData(obj)
@@ -216,16 +214,17 @@ classdef varBayesModelParafac2 < handle
         
         function initializeCAVI(obj)
             if obj.(obj.currentData).iter == 1
-                obj.(obj.currentData).n_components(1) = obj.(obj.currentqDist).nActiveComponents;
-                obj.(obj.currentData).n_components_hard(1) = obj.(obj.currentqDist).nActiveComponents('hard');
-                obj.(obj.currentData).evaltime(1) = 1e-10;
-                obj.(obj.currentData).evaltime_cpu(1) = 1e-10;
+                obj.(obj.currentData).n_components(obj.(obj.currentData).iter) = obj.(obj.currentqDist).nActiveComponents;
+                obj.(obj.currentData).n_components_hard(obj.(obj.currentData).iter) = obj.(obj.currentqDist).nActiveComponents('hard');
+                obj.(obj.currentData).evaltime(obj.(obj.currentData).iter) = 1e-10;
+                obj.(obj.currentData).evaltime_cpu(obj.(obj.currentData).iter) = 1e-10;
             end
         end
         function bool = checkIfNotConvergenced(obj)
             bool = abs(obj.(obj.currentData).ELBO_diff)/abs(obj.(obj.currentData).ELBO) > obj.opts.tol && ...
                 obj.opts.maxIter+1 > obj.(obj.currentData).iter && ...
-                obj.opts.maxTime > obj.(obj.currentData).getLatestEvalTime;
+                obj.opts.maxTime > obj.(obj.currentData).getLatestEvalTime || ...
+                50>obj.(obj.currentData).iter;
         end
         
         function storeDiagnostics(obj)
@@ -241,7 +240,7 @@ classdef varBayesModelParafac2 < handle
             obj.(obj.currentData).ELBO_chain(obj.(obj.currentData).iter) = obj.(obj.currentData).ELBO;
             obj.(obj.currentData).fit_chain(obj.(obj.currentData).iter) = obj.Parafac2Fit(obj.(obj.currentqDist));
             obj.(obj.currentData).evaltime(obj.(obj.currentData).iter) = toc(obj.(obj.currentData).ticCAVIwall)+obj.(obj.currentData).startWallTime;
-            %             obj.(obj.currentData).evaltime_cpu(obj.(obj.currentData).iter) = cputime-obj.(obj.currentData).ticCAVIcpu+obj.(obj.currentData).startCpuTime;
+            obj.(obj.currentData).evaltime_cpu(obj.(obj.currentData).iter) = cputime-obj.(obj.currentData).ticCAVIcpu+obj.(obj.currentData).startCpuTime;
             obj.(obj.currentData).n_components(obj.(obj.currentData).iter) = obj.(obj.currentqDist).nActiveComponents;
             obj.(obj.currentData).n_components_hard(obj.(obj.currentData).iter) = obj.(obj.currentqDist).nActiveComponents('hard');
         end
@@ -261,16 +260,16 @@ classdef varBayesModelParafac2 < handle
             if obj.opts.verbose
                 if obj.(obj.currentData).ELBO_diff/abs(obj.(obj.currentData).ELBO) < obj.opts.tol
                     fprintf('CAVI has converged with last change %f\n', abs(obj.(obj.currentData).ELBO_diff)/abs(obj.(obj.currentData).ELBO))
-                    %                     stopReason = 1;
+                    obj.(obj.currentData).stopReason = 'converged';
                 elseif obj.opts.maxIter <= obj.(obj.currentData).iter
                     fprintf('CAVI has stopped at iteration %d (max iteration) with change %f\n',obj.(obj.currentData).iter-1,abs(obj.(obj.currentData).ELBO_diff)/abs(obj.(obj.currentData).ELBO))
-                    %                     stopReason = 2;
-                elseif obj.opts.maxTime <= obj.(obj.currentData).evaltime(obj.evaltime==max(obj.(obj.currentData).evaltime))
+                    obj.(obj.currentData).stopReason = 'maximum iteration';
+                elseif obj.opts.maxTime <= obj.(obj.currentData).evaltime(obj.(obj.currentData).evaltime==max(obj.(obj.currentData).evaltime))
                     fprintf('CAVI has stopped after %f s. evaluation (max time) with change %f\n',obj.(obj.currentData).evaltime(obj.(obj.currentData).evaltime==max(obj.(obj.currentData).evaltime)),abs(obj.(obj.currentData).ELBO_diff)/abs(obj.(obj.currentData).ELBO))
-                    %                     stopReason = 3;
+                    obj.(obj.currentData).stopReason = 'maximum time';
                 elseif obj.Parafac2Fit(obj.(obj.currentqDist))/100>(1-obj.opts.tol)
                     fprintf('CAVI has stopped with a fit of %f %% with change %f\n',obj.Parafac2Fit(obj.(obj.currentqDist)),abs(obj.(obj.currentData).ELBO_diff)/abs(obj.(obj.currentData).ELBO))
-                    %                     stopReason = 4;
+                    obj.(obj.currentData).stopReason = 4;
                 end
             end
         end
@@ -392,9 +391,9 @@ classdef varBayesModelParafac2 < handle
             
             [~,index]= sort(obj.qDistTrain.qAlpha.mean,'ascend');
             
-            plotParafac2SolutionK(k,bsxfun(@minus,obj.data.X,obj.data.Etrue),obj.qDistTrain.qA.mean,obj.qDistTrain.qC.mean,...
-                obj.qDistTrain.qF.mean,obj.qDistTrain.qP.mean,obj.data.Atrue,obj.data.Ctrue,...
-                obj.data.Ftrue,obj.data.Ptrue,MLEflag,obj.qDistTrain.nActiveComponents,index);
+            plotParafac2SolutionK(k,bsxfun(@minus,obj.fullData.X,obj.fullData.Etrue),obj.qDistTrain.qA.mean,obj.qDistTrain.qC.mean,...
+                obj.qDistTrain.qF.mean,obj.qDistTrain.qP.mean,obj.fullData.Atrue,obj.fullData.Ctrue,...
+                obj.fullData.Ftrue,obj.fullData.Ptrue,MLEflag,obj.qDistTrain.nActiveComponents,index);
             
             
         end

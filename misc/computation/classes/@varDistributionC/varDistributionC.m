@@ -383,7 +383,7 @@ classdef varDistributionC < handle
         end
         
         function updateVariationalFactor(obj,variationalFactorName)
-            if ~ismember(variationalFactorName,{'qAlpha','qSigma'}) || obj.data.iter>=25 || strcmp(obj.data.partitionName,'Test')
+            if ~ismember(variationalFactorName,{'qSigma','qAlpha'}) || obj.data.iter>=25 || strcmp(obj.data.partitionName,'Test')
                 obj.(strcat('update',variationalFactorName));
                 obj.updateStatistics({variationalFactorName})
             end
@@ -695,7 +695,7 @@ classdef varDistributionC < handle
             end
             
             if strcmp(method,'hard')
-                nActive = sum(sum(obj.qC.mean)~=0);
+                nActive = sum(sum(obj.qC.mean,1)~=0);
             elseif strcmp(method,'threshold')
                 nActive = find(cumsum(sort(1./obj.qAlpha.mean,'descend')/sum(1./obj.qAlpha.mean))>0.95,1);
             end

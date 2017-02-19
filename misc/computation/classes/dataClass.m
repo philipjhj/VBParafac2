@@ -34,6 +34,7 @@ classdef dataClass < handle
         ELBOall
         errorIters = []
         errorIters_parameter = {};
+        stopReason
         
         % Temp Diagnostics
         ELBO = realmin;
@@ -116,16 +117,16 @@ classdef dataClass < handle
         end
         
         function restartDataDiagnostics(obj)
-            %             obj.ELBO_chain =
-            %             obj.fit_chain
-            %             obj.n_components
-            %             obj.n_components_hard
-            %             obj.evaltime
-            %             obj.evaltime_cpu
+            obj.ELBO_chain = [];
+            obj.fit_chain = [];
+            obj.n_components = [];
+            obj.n_components_hard = [];
+            obj.evaltime = [];
+            obj.evaltime_cpu = [];
             obj.iter = 1;
-            %             obj.ELBOall
-            %             obj.errorIters = []
-            %             obj.errorIters_parameter = {};
+            obj.ELBOall = [];
+            obj.errorIters = [];
+            obj.errorIters_parameter = {};
             %
             %             % Temp Diagnostics
             obj.ELBO_prev = 0;
