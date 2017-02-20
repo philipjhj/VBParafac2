@@ -383,7 +383,7 @@ classdef varDistributionC < handle
         end
         
         function updateVariationalFactor(obj,variationalFactorName)
-            if ~ismember(variationalFactorName,{'qSigma','qAlpha'}) || obj.data.iter>=25 || strcmp(obj.data.partitionName,'Test')
+            if ~ismember(variationalFactorName,{'qSigma'}) || obj.data.iter>=150 || strcmp(obj.data.partitionName,'Test')
                 obj.(strcat('update',variationalFactorName));
                 obj.updateStatistics({variationalFactorName})
             end

@@ -17,7 +17,7 @@ allTestValues = zeros(M,numel(SNR),numel(noiseType),numel(pMethod));
 for pMethodIdx=1:2
     for noiseIdx = 1:2
         for SNRIdx = 1:numel(SNR)
-            filename = strcat('/media/data/DataAndResults/VBParafac2paper/results_paper/par_CV_sim_data__dim_150_150_30_4_04__pMethod_',...
+            filename = strcat('/media/data/DataAndResults/VBParafac2paper/results_paper/EarlyResultsToBeDeleted/par_CV_sim_data__dim_150_150_30_4_04__pMethod_',...
                 pMethod{pMethodIdx},'_SNR_',num2str(SNR(SNRIdx)),'_noiseType_',noiseType{noiseIdx},'_datasetRNG_1.mat');
             if exist(filename, 'file') == 2
                 load(filename);
@@ -33,11 +33,12 @@ for pMethodIdx=1:2
             hold on
             plot(Ms,allTestValues(:,SNRIdx,noiseIdx,pMethodIdx),'o-','Color',colors(SNRIdx))
             grid on
-            legend(strtrim(cellstr(num2str(SNR','SNR=%d'))))
+            
             xlabel('Number of components')
             ylabel('ELBO')
             title(noiseType{noiseIdx})
         end
+        legend(strtrim(cellstr(num2str(SNR','SNR=%d'))))
     end
 end
 

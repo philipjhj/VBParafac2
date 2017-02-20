@@ -8,7 +8,7 @@ warning off MATLAB:nearlySingularMatrix
 %%
 % myModel=varBayesModelParafac2;
 rng('default')
-I=50;
+I=150;
 J=I;
 K=30;
 M=4;
@@ -20,7 +20,7 @@ options.initMethod = 'kiers';
 options.congruence = 0.4;
 % 1e4 1e-3 i ARD tests
 options.precision = [1e2 1e-6];
-options.SNR = -5;
+options.SNR = 0;
 options.noiseType = 'homo';
 % [1e4 1e-8] creates problems for qC
 
@@ -62,7 +62,7 @@ myModel.opts.estimationARD = 'max';
 myModel.opts.estimationNoise = 'avg';
 myModel.opts.matrixProductPrSlab = 'mtimesx';
 myModel.opts.nActiveComponents = 'threshold';
-myModel.opts.showIter = 1;
+myModel.opts.showIter = 5;
 myModel.opts.rngInput = 7;
 myModel.opts.maxIter = 5000;
 % myModel.opts.maxTime = 4;

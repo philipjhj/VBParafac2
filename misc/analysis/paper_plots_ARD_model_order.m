@@ -1,10 +1,11 @@
 
+pMethod = 'vonmises';
 colors = 'rgbm';
 noiseType = {'homo','hetero'};
 SNR = 0:-4:-12;
 for noiseIdx = 1:2
 for SNRIdx = 1:numel(SNR)
-load(strcat('/media/data/DataAndResults/VBParafac2paper/results_paper/ARD_sim_data__dim_150_150_30_4_04__pMethod_vonmises_SNR_',...
+load(strcat('/media/data/DataAndResults/VBParafac2paper/results_paper/EarlyResultsToBeDeleted/ARD_sim_data__dim_150_150_30_4_04__pMethod_',pMethod,'_SNR_',...
     num2str(SNR(SNRIdx)),'_noiseType_',noiseType{noiseIdx},'_datasetRNG_1.mat'))
 
 % FIND BEST INITIALIZATION
