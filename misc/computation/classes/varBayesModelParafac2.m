@@ -74,23 +74,27 @@ classdef varBayesModelParafac2 < handle
             obj.CV_ELBOS_train = zeros(obj.fullData.K,T,M);
             obj.CV_ELBOS_test = zeros(obj.fullData.K,T,M);
             for m = 1:M
-                
-                obj.dataTrain.M = Minterval(m);
-                obj.dataTest.M = Minterval(m);
-                
-                
                 for k = 1:obj.fullData.K
-                    obj.partitionData(obj.fullData.X,k);
+                    
                     fprintf('[Start: %s]\t[M: %d]\t[Fold: %d/%d]\n',...
                             datestr(datetime('now')),Minterval(m),k,obj.fullData.K)
                     % init train T times
                     for t = 1:T
+                        obj.dataTrain = dataClass;
+                        obj.dataTrain.partitionName = 'Train';
+                        obj.dataTrain.M = Minterval(m);
+                        obj.partitionData(obj.fullData.X,k);
+                        obj.qDistTrain = varDistributionC(obj,obj.dataTrain);
+
 %                         fprintf('[Train initialization: %d/%d]\n',t,T);
-                        obj.dataTrain.restartDataDiagnostics;
+%                         obj.dataTrain.restartDataDiagnostics;
+                        
                         obj.fitTrainingData;
+                        
                         
                         obj.cvRunsTrain{k,t,m} = struct('qDist',obj.qDistTrain,'Data',obj.dataTrain);
                         obj.CV_ELBOS_train(k,t,m) = obj.qDistTrain.ELBO;
+                        obj.dataTrain.Xunfolded = [];
                     end
                     
                     [~,ind]=max(obj.CV_ELBOS_train(k,:,m));
@@ -99,11 +103,19 @@ classdef varBayesModelParafac2 < handle
                     
                     % init test T times
                     for t = 1:T
+                        obj.dataTest = dataClass;
+                        obj.dataTest.partitionName = 'Test';
+                        obj.dataTest.M = Minterval(m);
+                        obj.partitionData(obj.fullData.X,k);
+                        obj.qDistTest = varDistributionC(obj,obj.dataTest);
+                        
 %                         fprintf('[Test initialization: %d/%d]\n',t,T);
-                        obj.dataTest.restartDataDiagnostics;
+%                         obj.dataTest.restartDataDiagnostics;
                         obj.fitTestData;
+                        
                         obj.cvRunsTest{k,t,m} = struct('qDist',obj.qDistTest,'Data',obj.dataTest);
                         obj.CV_ELBOS_test(k,t,m) = obj.qDistTest.ELBO;
+                        obj.dataTest.Xunfolded = [];
                     end
                     %                         fprintf('\t[Fold: %f]\n',obj.CV_ELBOS(k,t,m))
                 end
@@ -224,7 +236,7 @@ classdef varBayesModelParafac2 < handle
             bool = abs(obj.(obj.currentData).ELBO_diff)/abs(obj.(obj.currentData).ELBO) > obj.opts.tol && ...
                 obj.opts.maxIter+1 > obj.(obj.currentData).iter && ...
                 obj.opts.maxTime > obj.(obj.currentData).getLatestEvalTime || ...
-                50>obj.(obj.currentData).iter;
+                175>obj.(obj.currentData).iter;
         end
         
         function storeDiagnostics(obj)
@@ -257,20 +269,26 @@ classdef varBayesModelParafac2 < handle
             end
         end
         function printStopReason(obj)
-            if obj.opts.verbose
-                if obj.(obj.currentData).ELBO_diff/abs(obj.(obj.currentData).ELBO) < obj.opts.tol
+            if obj.(obj.currentData).ELBO_diff/abs(obj.(obj.currentData).ELBO) < obj.opts.tol
+                if obj.opts.verbose
                     fprintf('CAVI has converged with last change %f\n', abs(obj.(obj.currentData).ELBO_diff)/abs(obj.(obj.currentData).ELBO))
-                    obj.(obj.currentData).stopReason = 'converged';
-                elseif obj.opts.maxIter <= obj.(obj.currentData).iter
-                    fprintf('CAVI has stopped at iteration %d (max iteration) with change %f\n',obj.(obj.currentData).iter-1,abs(obj.(obj.currentData).ELBO_diff)/abs(obj.(obj.currentData).ELBO))
-                    obj.(obj.currentData).stopReason = 'maximum iteration';
-                elseif obj.opts.maxTime <= obj.(obj.currentData).evaltime(obj.(obj.currentData).evaltime==max(obj.(obj.currentData).evaltime))
-                    fprintf('CAVI has stopped after %f s. evaluation (max time) with change %f\n',obj.(obj.currentData).evaltime(obj.(obj.currentData).evaltime==max(obj.(obj.currentData).evaltime)),abs(obj.(obj.currentData).ELBO_diff)/abs(obj.(obj.currentData).ELBO))
-                    obj.(obj.currentData).stopReason = 'maximum time';
-                elseif obj.Parafac2Fit(obj.(obj.currentqDist))/100>(1-obj.opts.tol)
-                    fprintf('CAVI has stopped with a fit of %f %% with change %f\n',obj.Parafac2Fit(obj.(obj.currentqDist)),abs(obj.(obj.currentData).ELBO_diff)/abs(obj.(obj.currentData).ELBO))
-                    obj.(obj.currentData).stopReason = 4;
                 end
+                obj.(obj.currentData).stopReason = 'converged';
+            elseif obj.opts.maxIter <= obj.(obj.currentData).iter
+                if obj.opts.verbose
+                    fprintf('CAVI has stopped at iteration %d (max iteration) with change %f\n',obj.(obj.currentData).iter-1,abs(obj.(obj.currentData).ELBO_diff)/abs(obj.(obj.currentData).ELBO))
+                end
+                obj.(obj.currentData).stopReason = 'maximum iteration';
+            elseif obj.opts.maxTime <= obj.(obj.currentData).evaltime(obj.(obj.currentData).evaltime==max(obj.(obj.currentData).evaltime))
+                if obj.opts.verbose
+                    fprintf('CAVI has stopped after %f s. evaluation (max time) with change %f\n',obj.(obj.currentData).evaltime(obj.(obj.currentData).evaltime==max(obj.(obj.currentData).evaltime)),abs(obj.(obj.currentData).ELBO_diff)/abs(obj.(obj.currentData).ELBO))
+                end
+                obj.(obj.currentData).stopReason = 'maximum time';
+            elseif obj.Parafac2Fit(obj.(obj.currentqDist))/100>(1-obj.opts.tol)
+                if obj.opts.verbose
+                    fprintf('CAVI has stopped with a fit of %f %% with change %f\n',obj.Parafac2Fit(obj.(obj.currentqDist)),abs(obj.(obj.currentData).ELBO_diff)/abs(obj.(obj.currentData).ELBO))
+                end
+                obj.(obj.currentData).stopReason = 4;
             end
         end
         function cleanUp(obj)

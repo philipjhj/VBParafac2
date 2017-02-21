@@ -41,15 +41,22 @@ classdef normalParafac2 < handle
             
             obj.M = M;
             [A,F,C,P,modelFit]=parafac2(obj.X,obj.M,[0 0],[0 0 0 0 1]);
-            
-            
             obj.A = A;
             obj.F = F;
             obj.C = C;
             obj.P = cat(3,P{:});
             obj.fit = modelFit;
+        end
+        
+        function value = CCDParafac2(obj)
+           
+            factors{1} = obj.A;
+            factors{2} = obj.F;
+            factors{3} = obj.C;
             
+            XPk = mtimesx(obj.X,obj.P);
             
+            value = corcond(XPk,factors,[],0);
         end
         
         function [fit,fit_true] = Parafac2Fit(obj,Xtrue)
