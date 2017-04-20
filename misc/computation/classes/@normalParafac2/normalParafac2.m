@@ -61,6 +61,7 @@ classdef normalParafac2 < handle
         
         function [fit,fit_true] = Parafac2Fit(obj,Xtrue)
             
+            
             obj.D = zeros(size(obj.C,2),size(obj.C,2),size(obj.C,1));
             
             for k = 1:size(obj.C,1)
@@ -80,7 +81,7 @@ classdef normalParafac2 < handle
             end
             
             fit=(1-sum_res/sum_x)*100;
-            fit_true=(1-sum_res/norm(Xtrue(:))^2)*100;
+%             fit_true=(1-sum_res/norm(Xtrue(:))^2)*100;
             
         end
         
@@ -103,6 +104,42 @@ classdef normalParafac2 < handle
             
         end
        
+        
+        function X_components=plotComponents(obj,xaxis)
+            
+            X=obj.X;
+            K=size(X,3);
+            M=obj.M;
+            
+            A=obj.A;
+            C=obj.C;
+            F=obj.F;
+            P=obj.P;
+            
+            PF = mtimesx(P,F);
+            
+            X_components = zeros([size(X),M]);
+            for k = 1:K
+                for m = 1:M
+                X_components(:,:,k,m)=A(:,m)*C(k,m)*PF(:,m)';
+                end
+            end
+            Ms=[2 3 1];
+            for m = 1:M
+                subplot(1,3,m)
+                for k = 1:K
+                plot(xaxis,X_components(:,:,k,Ms(m)));
+%                 hold on
+                end
+                grid on
+axis tight
+if m == 2
+xlabel('Emission wavelength')
+end
+set(gca,'fontsize',42)
+            end
+            
+        end
         
         function obj = compute_reconstruction(obj,data)
             

@@ -11,8 +11,8 @@ rng('default')
 I=150;
 J=I;
 K=30;
-M=1;
-Mesti = M;
+M=4;
+Mesti = 1;
 
 options.dimensions = [I J K M];
 options.initMethod = 'kiers';
@@ -26,8 +26,8 @@ options.noiseType = 'homo';
 
 % sumSNR = 0;
 % for k = 1:100
-% rng('shuffle')
-rng(1)
+rng('shuffle')
+% rng(1)
 data = varBayesModelParafac2.generateDataFromModel(options);
 
 %
@@ -73,11 +73,11 @@ myModel.opts.estimationNoise = 'avg';
 myModel.opts.matrixProductPrSlab = 'mtimesx';
 myModel.opts.nActiveComponents = 'threshold';
 myModel.opts.showIter = 1;
-myModel.opts.rngInput = 1;
-myModel.opts.maxIter = 500;
+% myModel.opts.rngInput = 1;
+myModel.opts.maxIter = 150;
 % myModel.opts.maxTime = 4;
 
-myModel.opts.activeParams = {'qA','qF','qC','qP','qAlpha','qSigma'};
+myModel.opts.activeParams = {'qC','qP','qA','qF','qAlpha','qSigma'};
 %
 myModel.partitionData(myModel.fullData.X)
 % tic

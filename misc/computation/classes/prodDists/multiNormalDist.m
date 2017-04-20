@@ -91,11 +91,14 @@ classdef multiNormalDist < probabilityDist
                 a = squeeze(sum(bsxfun(@times,obj.util.matrixProductPrSlab(obj.mean,A),obj.mean),2));
                 b = squeeze(sum(sum(bsxfun(@times,eye(obj.J),obj.util.matrixProductPrSlab(A,obj.variance)),1),2))';
             else
-                a = squeeze(obj.util.matrixProductPrSlab(obj.util.matrixProductPrSlab(obj.mean,A),obj.mean'));
-                
-                x = squeeze(sum(sum(bsxfun(@times,eye(obj.J),obj.util.matrixProductPrSlab(A,obj.variance)),1),2));
-                b = obj.util.matrixDiagonalPrSlab(x);
-                
+                if numel(obj.mean) == 1
+                    a = obj.util.matrixProductPrSlab(obj.util.matrixProductPrSlab(obj.mean,A),obj.mean');
+                    b = sum(sum(bsxfun(@times,eye(obj.J),obj.util.matrixProductPrSlab(A,obj.variance)),1),2);
+                else
+                    a = squeeze(obj.util.matrixProductPrSlab(obj.util.matrixProductPrSlab(obj.mean,A),obj.mean'));
+                    x = squeeze(sum(sum(bsxfun(@times,eye(obj.J),obj.util.matrixProductPrSlab(A,obj.variance)),1),2));
+                    b = obj.util.matrixDiagonalPrSlab(x);
+                end
             end
             
             matrixIPS = bsxfun(@plus,a,b);
@@ -108,9 +111,14 @@ classdef multiNormalDist < probabilityDist
     methods (Access = protected)
         function value = computeElementWiseSquared(obj)
             % E[X.^2]
-            variance=permute(squeeze(sum(bsxfun(@times,eye(obj.J),obj.variance),2)),[2 1 3]);
+            if obj.J>1
+                variance=permute(squeeze(sum(bsxfun(@times,eye(obj.J),obj.variance),2)),[2 1 3]);
+                value=bsxfun(@plus,variance,obj.mean.^2);
+            else
+                variance=permute(sum(bsxfun(@times,eye(obj.J),obj.variance),2),[3 2 1]);
+                value=variance+obj.mean.^2;
+            end
             
-            value=bsxfun(@plus,variance,obj.mean.^2);
         end
         
         function value = computeMeanInnerProduct(obj,A)

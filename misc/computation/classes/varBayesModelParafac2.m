@@ -77,7 +77,7 @@ classdef varBayesModelParafac2 < handle
                 for k = 1:obj.fullData.K
                     
                     fprintf('[Start: %s]\t[M: %d]\t[Fold: %d/%d]\n',...
-                            datestr(datetime('now')),Minterval(m),k,obj.fullData.K)
+                        datestr(datetime('now')),Minterval(m),k,obj.fullData.K)
                     % init train T times
                     for t = 1:T
                         obj.dataTrain = dataClass;
@@ -85,9 +85,9 @@ classdef varBayesModelParafac2 < handle
                         obj.dataTrain.M = Minterval(m);
                         obj.partitionData(obj.fullData.X,k);
                         obj.qDistTrain = varDistributionC(obj,obj.dataTrain);
-
-%                         fprintf('[Train initialization: %d/%d]\n',t,T);
-%                         obj.dataTrain.restartDataDiagnostics;
+                        
+                        %                         fprintf('[Train initialization: %d/%d]\n',t,T);
+                        %                         obj.dataTrain.restartDataDiagnostics;
                         
                         obj.fitTrainingData;
                         
@@ -109,8 +109,8 @@ classdef varBayesModelParafac2 < handle
                         obj.partitionData(obj.fullData.X,k);
                         obj.qDistTest = varDistributionC(obj,obj.dataTest);
                         
-%                         fprintf('[Test initialization: %d/%d]\n',t,T);
-%                         obj.dataTest.restartDataDiagnostics;
+                        %                         fprintf('[Test initialization: %d/%d]\n',t,T);
+                        %                         obj.dataTest.restartDataDiagnostics;
                         obj.fitTestData;
                         
                         obj.cvRunsTest{k,t,m} = struct('qDist',obj.qDistTest,'Data',obj.dataTest);
@@ -236,7 +236,7 @@ classdef varBayesModelParafac2 < handle
             bool = abs(obj.(obj.currentData).ELBO_diff)/abs(obj.(obj.currentData).ELBO) > obj.opts.tol && ...
                 obj.opts.maxIter+1 > obj.(obj.currentData).iter && ...
                 obj.opts.maxTime > obj.(obj.currentData).getLatestEvalTime || ...
-                175>obj.(obj.currentData).iter;
+                1>obj.(obj.currentData).iter;
         end
         
         function storeDiagnostics(obj)
@@ -406,7 +406,6 @@ classdef varBayesModelParafac2 < handle
             
             
             %             MLEflag = 1;
-            
             [~,index]= sort(obj.qDistTrain.qAlpha.mean,'ascend');
             
             plotParafac2SolutionK(k,bsxfun(@minus,obj.fullData.X,obj.fullData.Etrue),obj.qDistTrain.qA.mean,obj.qDistTrain.qC.mean,...
@@ -419,16 +418,16 @@ classdef varBayesModelParafac2 < handle
             xRecon = obj.qDistTrain.qA.mean*diag(obj.qDistTrain.qC.mean(k,:))*obj.qDistTrain.qF.mean'*obj.qDistTrain.qP.mean(:,:,k)';
             
             subplot(1,3,1)
-            imagesc(obj.data.X(:,:,k))
+            imagesc(obj.dataTrain.X(:,:,k))
             colorbar
             subplot(1,3,2)
             imagesc(xRecon)
             colorbar
             subplot(1,3,3)
-            imagesc((obj.data.X(:,:,k)-xRecon)./abs(obj.data.X(:,:,k)))
+            imagesc((obj.dataTrain.X(:,:,k)-xRecon)./abs(obj.dataTrain.X(:,:,k)))
             colorbar
             
-            avgError=sum(sum((obj.data.X(:,:,k)-xRecon)./abs(obj.data.X(:,:,k))))/numel(xRecon);
+            avgError=sum(sum((obj.dataTrain.X(:,:,k)-xRecon)./abs(obj.dataTrain.X(:,:,k))))/numel(xRecon);
             fprintf('Avg. Error on relative estimate: %f\n',avgError)
         end
         function plotSolutionReal3D(obj,k,m,mask)
@@ -492,6 +491,48 @@ classdef varBayesModelParafac2 < handle
             
             fit=gather((1-sum_res/sum_x)*100);
             fit_true=gather((1-sum_res/norm(qDist.data.Xtrue(:))^2)*100);
+            
+        end
+        
+        function X_components=plotComponents(obj,xaxis)
+            
+            X=obj.dataTrain.X;
+            K=obj.dataTrain.K;
+            M=obj.dataTrain.M;
+            
+            A=obj.qDistTrain.qA.mean;
+            C=obj.qDistTrain.qC.mean;
+            F=obj.qDistTrain.qF.mean;
+            P=obj.qDistTrain.qP.mean;
+            
+            PF = mtimesx(P,F);
+            
+            X_components = zeros([size(X),M]);
+            for k = 1:K
+                for m = 1:M
+                    if any(m==[])
+                        cont=-1;
+                    else
+                        cont=1;
+                    end
+                    X_components(:,:,k,m)=cont*A(:,m)*C(k,m)*PF(:,m)';
+                end
+            end
+            
+            for m = 1:M
+                subplot(1,3,m)
+                for k = 1:K
+                    plot(xaxis,X_components(:,:,k,m));
+                    %                 hold on
+                end
+                grid on
+                axis tight
+                
+                if m == 2
+                    xlabel('Emission wavelength')
+                end
+                set(gca,'fontsize',42)
+            end
             
         end
         function value = SNR(obj,qDist)
@@ -573,7 +614,7 @@ classdef varBayesModelParafac2 < handle
                 if strcmp(dataSettings.noiseType,'hetero')
                     pp=rand(1,generatedData.K);
                 elseif strcmp(dataSettings.noiseType,'homo')
-                    pp=ones(1,generatedData.K); 
+                    pp=ones(1,generatedData.K);
                 end
                 
                 pp=pp/sum(pp)*generatedData.K;
@@ -585,7 +626,7 @@ classdef varBayesModelParafac2 < handle
                         ,eye(generatedData.J)*ssq*pp(k));
                 end
                 
-%                 disp((norm(generatedData.Xtrue(:),'fro')^2/norm(generatedData.Etrue(:),'fro')^2))
+                %                 disp((norm(generatedData.Xtrue(:),'fro')^2/norm(generatedData.Etrue(:),'fro')^2))
                 
                 generatedData.Xunfolded = generatedData.Xtrue+generatedData.Etrue;
                 

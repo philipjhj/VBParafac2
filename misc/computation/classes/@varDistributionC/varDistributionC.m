@@ -93,7 +93,6 @@ classdef varDistributionC < handle
             obj.qP = multiNormalDist('qP',[obj.data.J obj.data.M obj.data.K],true,obj.util);
             obj.qSigma = GammaDist('qSigma',[1 obj.data.K]);
             obj.qAlpha = GammaDist('qAlpha',[1 obj.data.M]);
-            
             obj.pSigma = GammaDist('pSigma',[1 1]);
             obj.pAlpha = GammaDist('pAlpha',[1 1]);
             
@@ -219,6 +218,7 @@ classdef varDistributionC < handle
         
         function value = get.ELBO(obj)
             value = gather(obj.ePxz+obj.eQz);
+            %  fprintf('%f \n',[obj.ePxz,obj.eQz]);
         end
         
         function value = get.ePxz(obj)
@@ -232,6 +232,10 @@ classdef varDistributionC < handle
                 value = obj.qXMeanLog+obj.qCMeanLog+...
                     obj.qPMeanLog+obj.qSigmaMeanLog;
             end
+            %             fprintf('%f \n',[obj.qXMeanLog,obj.qAMeanLog,obj.qCMeanLog,...
+            %                     obj.qFMeanLog,obj.qPMeanLog,obj.qSigmaMeanLog,...
+            %                     obj.qAlphaMeanLog])
+            %               fprintf('----\n')
         end
         function value = get.eQz(obj)
             obj.computeEntropyValues(obj.opts.activeParams)
@@ -243,6 +247,8 @@ classdef varDistributionC < handle
                 value = obj.qCEntropy+...
                     obj.qPEntropy+obj.qSigmaEntropy;
             end
+            %fprintf('%f \n%',[obj.qAEntropy,obj.qCEntropy,obj.qFEntropy,...
+            %        obj.qPEntropy,obj.qSigmaEntropy,obj.qAlphaEntropy])
         end
         
         function computeMeanLogValues(obj,variationalFactorNames)
@@ -383,7 +389,7 @@ classdef varDistributionC < handle
         end
         
         function updateVariationalFactor(obj,variationalFactorName)
-            if ~ismember(variationalFactorName,{'qSigma'}) || obj.data.iter>=150 || strcmp(obj.data.partitionName,'Test')
+            if ~ismember(variationalFactorName,{'qSigma','qAlpha'}) || obj.data.iter>=20 || strcmp(obj.data.partitionName,'Test')
                 obj.(strcat('update',variationalFactorName));
                 obj.updateStatistics({variationalFactorName})
             end
@@ -463,7 +469,7 @@ classdef varDistributionC < handle
                 obj.eA))),1)),...
                 obj.qC.variance))';
             
-            if size(obj.qC.mean,2) == 1
+            if size(obj.qC.mean,1) == 1
                 obj.qC.mean = obj.qC.mean';
             end
         end
@@ -473,7 +479,11 @@ classdef varDistributionC < handle
             n = obj.data.K;
             
             % the bsxfun as index for ePtP gets the diagonals
-            ePtPdiag = reshape(obj.ePtP(bsxfun(@plus,[1:p+1:p*p]',[0:n-1]*p*p))',1,1,n,p);
+            if obj.data.M>1
+                ePtPdiag = reshape(obj.ePtP(bsxfun(@plus,[1:p+1:p*p]',[0:n-1]*p*p))',1,1,n,p);
+            else
+                ePtPdiag = obj.ePtP;
+            end
             
             varInv = bsxfun(@plus,squeeze(sum(...
                 obj.util.hadamardProductPrSlab(...
@@ -499,11 +509,16 @@ classdef varDistributionC < handle
                 
                 c = squeeze(sum(b,2));
                 
-                t1=sum(obj.util.hadamardProductPrSlab(...
-                    obj.util.transformToTensor(obj.qSigma.mean),...
-                    obj.util.matrixProductPrSlab(...
-                    obj.eDAtAD,...
-                    c(:,m,:))),3)';
+                if obj.data.M>1
+                    t1=sum(obj.util.hadamardProductPrSlab(...
+                        obj.util.transformToTensor(obj.qSigma.mean),...
+                        obj.util.matrixProductPrSlab(...
+                        obj.eDAtAD,...
+                        c(:,m,:))),3)';
+                else
+                    t1=0;
+                end
+                
                 
                 obj.qF.mean(m,:) = (t2(m,:)-t1)*obj.qF.variance(:,:,m);
             end
@@ -511,12 +526,21 @@ classdef varDistributionC < handle
         function updateqP(obj)
             if ~strcmp(obj.opts.estimationP,'vonmises')
                 %
-                obj.qP.variance = permute( obj.util.matrixInversePrSlab(bsxfun(@plus,obj.util.hadamardProductPrSlab(...
-                    obj.util.transformToTensor(obj.qSigma.mean),...
-                    (obj.qF.computeMeanInnerProductScaledSlabs(...
-                    permute(obj.eDAtAD,[1 2 4 3])...
-                    )))...
-                    ,eye(obj.data.M))),[1 2 4 3]);
+                if obj.data.M>1
+                    obj.qP.variance = permute(obj.util.matrixInversePrSlab(bsxfun(@plus,obj.util.hadamardProductPrSlab(...
+                        obj.util.transformToTensor(obj.qSigma.mean),...
+                        (obj.qF.computeMeanInnerProductScaledSlabs(...
+                        permute(obj.eDAtAD,[1 2 4 3])...
+                        )))...
+                        ,eye(obj.data.M))),[1 2 4 3]);
+                else
+                    obj.qP.variance = permute(obj.util.matrixInversePrSlab(bsxfun(@plus,obj.util.hadamardProductPrSlab(...
+                        obj.util.transformToTensor(obj.qSigma.mean),...
+                        obj.qF.computeMeanInnerProductScaledSlabs(...
+                        obj.eDAtAD...
+                        ))...
+                        ,eye(obj.data.M))),[1 2 4 3]);
+                end
             end
             obj.computeqPmean;
         end
@@ -629,6 +653,7 @@ classdef varDistributionC < handle
                 permute(obj.qP.mean,[2 1 3]));
         end
         function compute_eDeAtXk(obj)
+            
             obj.eDeAtXk = obj.util.matrixProductPrSlab(obj.util.matrixProductPrSlab(...
                 obj.eD,obj.eA'),...
                 obj.data.X);
@@ -655,22 +680,35 @@ classdef varDistributionC < handle
             if strcmp(obj.opts.estimationP,'vonmises')
                 obj.ePtP = repmat(eye(obj.data.M),1,1,obj.data.K);
             else
-                obj.ePtP = obj.data.J*squeeze(obj.qP.variance)+repmat(eye(obj.data.M),1,1,obj.data.K);%repmat(eye(obj.data.M),1,1,obj.data.K);
+                if obj.data.M>1
+                    qPVariance=squeeze(obj.qP.variance);
+                else
+                    qPVariance=permute(obj.qP.variance,[1 2 4 3]);
+                end
+                obj.ePtP = obj.data.J*qPVariance+repmat(eye(obj.data.M),1,1,obj.data.K);%repmat(eye(obj.data.M),1,1,obj.data.K);
             end
         end
         function compute_eFtPtPF(obj)
-            diagFvec=reshape(obj.qF.mean',1,obj.data.M,1,obj.data.M);
-            diagFvecT = permute(diagFvec,[2 1 4 3]);
-            fullF=(obj.util.matrixProductPrSlab(diagFvecT,diagFvec));
-            
-            ePtPtensor=reshape(obj.ePtP,1,1,obj.data.M,obj.data.M,obj.data.K);
-            ePtPdiag = reshape(sum(...
-                obj.util.hadamardProductPrSlab(eye(obj.data.M),obj.ePtP),2),...
-                1,1,obj.data.M,obj.data.K);
-            
-            value=squeeze(sum(sum(...
-                obj.util.hadamardProductPrSlab(fullF,ePtPtensor),3),4))+...
-                squeeze(sum(obj.util.hadamardProductPrSlab(obj.qF.variance,ePtPdiag),3));
+            if obj.data.M>1
+                diagFvec=reshape(obj.qF.mean',1,obj.data.M,1,obj.data.M);
+                diagFvecT = permute(diagFvec,[2 1 4 3]);
+                fullF=(obj.util.matrixProductPrSlab(diagFvecT,diagFvec));
+                
+                ePtPtensor=reshape(obj.ePtP,1,1,obj.data.M,obj.data.M,obj.data.K);
+                ePtPdiag = reshape(sum(...
+                    obj.util.hadamardProductPrSlab(eye(obj.data.M),obj.ePtP),2),...
+                    1,1,obj.data.M,obj.data.K);
+                v1=squeeze(sum(sum(...
+                    obj.util.hadamardProductPrSlab(fullF,ePtPtensor),3),4));
+                
+                v2=squeeze(sum(obj.util.hadamardProductPrSlab(obj.qF.variance,ePtPdiag),3));
+                
+                value=v1+v2;
+            else
+                value = obj.util.hadamardProductPrSlab(obj.qF.variance,obj.ePtP)+...
+                    obj.util.hadamardProductPrSlab(obj.qF.mean^2,obj.ePtP);
+                
+            end
             
             obj.eFtPtPF = value;
         end
