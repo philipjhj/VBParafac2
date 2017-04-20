@@ -38,6 +38,7 @@ classdef varDistributionC < handle
         
         % Shared terms between moments
         
+        eAlphaDiag
         eFtPt
         eDeAtXk
         eDeAtXkeFtPtTrace
@@ -92,9 +93,22 @@ classdef varDistributionC < handle
             obj.qF = multiNormalDist('qF',[obj.data.M obj.data.M],false,obj.util);
             obj.qP = multiNormalDist('qP',[obj.data.J obj.data.M obj.data.K],true,obj.util);
             obj.qSigma = GammaDist('qSigma',[1 obj.data.K]);
-            obj.qAlpha = GammaDist('qAlpha',[1 obj.data.M]);
+            if strcmp(obj.opts.estimationARD,'maxNoARD')
+                obj.qAlpha = GammaDist('qAlpha',[1 1]);
+            else
+                obj.qAlpha = GammaDist('qAlpha',[1 obj.data.M]);
+            end
             obj.pSigma = GammaDist('pSigma',[1 1]);
             obj.pAlpha = GammaDist('pAlpha',[1 1]);
+            
+            
+            % Start in MLE Parafac2 solution
+            [A,F,C,P,modelFit]=parafac2(obj.data.X,obj.data.M,[0 0],[0 0 0 0 1]);
+            
+            obj.qA.mean = A;
+            obj.qF.mean = F;
+            obj.qC.mean = C;
+            obj.qP.mean = cat(3,P{:});
             
             if strcmpi(obj.opts.matrixProductPrSlab,'gpu')
                 obj.qA.mean = gpuArray(obj.qA.mean);
@@ -128,6 +142,7 @@ classdef varDistributionC < handle
         
         % TODO: Refactor SufficientStatistics into seperate class?
         function updateSufficientStatistics(obj)
+            obj.compute_eAlphaDiag;
             obj.compute_eA;
             obj.compute_eAtA;
             obj.compute_eD;
@@ -210,6 +225,8 @@ classdef varDistributionC < handle
                 obj.compute_eAiDFtPtPFDAi;
                 obj.compute_eDeAtXk;
                 obj.compute_eDeAtXkeFtPtTrace;
+            elseif strcmp(VariationalFactorName,'qAlpha')
+                obj.compute_eAlphaDiag;
             end
         end
         
@@ -271,8 +288,10 @@ classdef varDistributionC < handle
                 obj.computeqCMeanLog;
             end
             
-            % No expected value if hyperparameter are maximized
-            if strcmp(obj.opts.estimationNoise,'max')
+            
+            
+                % No expected value if hyperparameter are maximized
+            if strcmp(obj.opts.estimationNoise,'max2')
                 obj.qSigmaMeanLog = 0;
             end
             if strcmp(obj.opts.estimationARD,'max')
@@ -296,7 +315,7 @@ classdef varDistributionC < handle
                 obj.qPEntropy = obj.qPvonmisesEntropy;
             end
             
-            if strcmp(obj.opts.estimationNoise,'max')
+            if strcmp(obj.opts.estimationNoise,'max2')
                 obj.qSigmaEntropy = 0;
             end
             if strcmp(obj.opts.estimationARD,'max')
@@ -330,8 +349,8 @@ classdef varDistributionC < handle
             end
             obj.qCMeanLog = -obj.qC.I*obj.qC.J*log(2*pi)/2+...
                 obj.data.K/2*sum(obj.qAlpha.MeanLog)-1/2*(...
-                trace(diag(obj.qAlpha.mean)*sum(obj.qC.variance,3))+...
-                sum(sum(obj.qC.mean.^2*diag(obj.qAlpha.mean))));
+                trace(obj.eAlphaDiag*sum(obj.qC.variance,3))+...
+                sum(sum(obj.qC.mean.^2*obj.eAlphaDiag)));
             
         end
         function computeqFMeanLog(obj)
@@ -403,15 +422,19 @@ classdef varDistributionC < handle
             obj.updateStatisticsSpecialCases(variationalFactorNames);
         end
         function updateStatisticsSpecialCases(obj,variationalFactorNames)
-            if ismember('qAlpha',variationalFactorNames) && ...
-                    strcmp(obj.opts.estimationARD,'max')
-                
-                obj.qAlpha.mean = obj.data.K./sum(obj.eCsquared,1);
-                obj.qAlpha.MeanLog = log(obj.qAlpha.mean);
+            %TODO: fix this abomination
+            if ismember('qAlpha',variationalFactorNames)
+                if strcmp(obj.opts.estimationARD,'max')
+                    obj.qAlpha.mean = obj.data.K./sum(obj.eCsquared,1);
+                    obj.qAlpha.MeanLog = log(obj.qAlpha.mean);
+                elseif strcmp(obj.opts.estimationARD,'maxNoARD')
+                    obj.qAlpha.mean = obj.data.K*obj.data.M./sum(sum(obj.eCsquared,1));
+                    obj.qAlpha.MeanLog = log(obj.qAlpha.mean);
+                end
             end
             
             if ismember('qSigma',variationalFactorNames) && ...
-                    strcmp(obj.opts.estimationNoise,'max')
+                    strcmp(obj.opts.estimationNoise,'max2')
                 
                 obj.qSigma.mean = 1./(1/(obj.data.J*obj.data.I)*(sum(obj.eAiDFtPtPFDAi,1)+...
                     obj.XInnerProductPrSlab-...
@@ -458,7 +481,7 @@ classdef varDistributionC < handle
                 obj.util.transformToTensor(obj.qSigma.mean),...
                 obj.util.hadamardProductPrSlab(obj.eAtA,...
                 obj.eFtPtPF))...
-                ,diag(obj.qAlpha.mean)));
+                ,obj.eAlphaDiag));
             
             obj.qC.mean=squeeze(obj.util.matrixProductPrSlab(...
                 obj.util.hadamardProductPrSlab(...
@@ -619,6 +642,12 @@ classdef varDistributionC < handle
                     obj.eDeAtXkeFtPtTrace);
                 
             elseif strcmp(obj.opts.estimationNoise,'max')
+                obj.qSigma.updateStatistics;
+                [obj.qSigma.alpha,obj.qSigma.beta] = hp_update_gamma(...
+                    obj.qSigma.alpha,obj.qSigma.beta,obj.qSigma.mean,obj.qSigma.MeanLog);
+                
+                
+            elseif strcmp(obj.opts.estimationNoise,'max2')
                 obj.qSigma.mean = 1./(1/(obj.data.J*obj.data.I)*...
                     (sum(obj.eAiDFtPtPFDAi,1)+...
                     obj.XInnerProductPrSlab-...
@@ -627,6 +656,7 @@ classdef varDistributionC < handle
                 obj.qSigma.MeanLog = log(obj.qSigma.mean);
             end
         end
+        
         function updateqAlpha(obj)
             if strcmp(obj.opts.estimationARD,'avg')
                 obj.qAlpha.alpha(:) = obj.pAlpha.alpha+1/2*obj.data.K;
@@ -634,6 +664,11 @@ classdef varDistributionC < handle
             elseif strcmp(obj.opts.estimationARD,'max')
                 obj.qAlpha.mean = obj.data.K./sum(obj.eCsquared,1);
                 obj.qAlpha.MeanLog = log(obj.qAlpha.mean);
+            elseif strcmp(obj.opts.estimationARD,'maxNoARD')
+                obj.qAlpha.mean = obj.data.K*obj.data.M./sum(sum(obj.eCsquared,1));
+                obj.qAlpha.MeanLog = log(obj.qAlpha.mean);
+            elseif strcmp(obj.opts.estimationARD,'avgNoARD')
+                %TODO: implement this
             end
         end
         
@@ -641,6 +676,13 @@ classdef varDistributionC < handle
         % # Shared Terms
         
         % ## First order
+        function compute_eAlphaDiag(obj)
+           if ismatrix(obj.qAlpha.mean)
+            obj.eAlphaDiag = diag(obj.qAlpha.mean);
+           else
+            obj.eAlphaDiag = eye(obj.data.M)*obj.qAlpha.mean;
+           end
+        end
         function compute_eD(obj)
             obj.eD = obj.util.matrixDiagonalPrSlab(obj.qC.mean');
         end
@@ -735,7 +777,11 @@ classdef varDistributionC < handle
             if strcmp(method,'hard')
                 nActive = sum(sum(obj.qC.mean,1)~=0);
             elseif strcmp(method,'threshold')
-                nActive = find(cumsum(sort(1./obj.qAlpha.mean,'descend')/sum(1./obj.qAlpha.mean))>0.95,1);
+                if ~strcmp(obj.opts.estimationARD,'maxNoARD')
+                    nActive = find(cumsum(sort(1./obj.qAlpha.mean,'descend')/sum(1./obj.qAlpha.mean))>0.95,1);
+                else
+                    nActive=-1; % not available
+                end
             end
             nActive = gather(nActive);
         end

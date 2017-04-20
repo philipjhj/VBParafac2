@@ -12,7 +12,7 @@ I=150;
 J=I;
 K=30;
 M=4;
-Mesti = 1;
+Mesti = M;
 
 options.dimensions = [I J K M];
 options.initMethod = 'kiers';
@@ -68,13 +68,13 @@ myModel.opts.verbose = 1;
 myModel.opts.debugFlag = 2;
 myModel.opts.estimationP= 'parafac2svd';
 % myModel.opts.estimationP = 'vonmises';
-myModel.opts.estimationARD = 'max';
+myModel.opts.estimationARD = 'maxNoARD';
 myModel.opts.estimationNoise = 'avg';
 myModel.opts.matrixProductPrSlab = 'mtimesx';
 myModel.opts.nActiveComponents = 'threshold';
 myModel.opts.showIter = 1;
 % myModel.opts.rngInput = 1;
-myModel.opts.maxIter = 150;
+myModel.opts.maxIter = 5000;
 % myModel.opts.maxTime = 4;
 
 myModel.opts.activeParams = {'qC','qP','qA','qF','qAlpha','qSigma'};
