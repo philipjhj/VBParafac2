@@ -222,14 +222,14 @@ for i = 2:numel(trueCell)
     axes(ha(i))
     displayImageValues(myImageTrue,titleTrueCell{i},colorInterval)
     
-    if i == 3
+    if any(i == [3,5])
         addValuesToImage(myImageTrue)
     end
     
     axes(ha(i+nCols))
     displayImageValues(myImageEsti,titleEstiCell{i},colorInterval)
     
-    if i == 3
+    if any(i == [3,5])
         addValuesToImage(myImageEsti)
     end
     

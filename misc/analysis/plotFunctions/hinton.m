@@ -1,4 +1,4 @@
-function h = hinton(w,subpIdx,subpSize)
+function h = hinton(w,subpIdx,subpSize,title)
 %HINTON	Plot Hinton diagram for a weight matrix.
 %
 %	Description
@@ -45,20 +45,24 @@ else
 end
 
 if nargin < 2  || subpIdx == 1
-h = figure('Color', [0.5 0.5 0.5], ...
-  'Name', 'Hinton diagram', ...
-  'NumberTitle', 'off', ...
-  'Colormap', [0 0 0; 1 1 1], ...
-  'Units', 'pixels', ...
-  'Position', [x01 y01 delx dely]);
+% h = figure('Color', [0.5 0.5 0.5], ...
+%   'Name', 'Hinton', ...
+%   'NumberTitle', 'off', ...
+%   'Colormap', [0 0 0; 1 1 1], ...
+%   'Units', 'pixels', ...
+%   'Position', [x01 y01 delx dely]);
 end
 if nargin > 1
-subplot(subpSize(1),subpSize(2),subpIdx)
+    if isa(subpIdx,'matlab.graphics.axis.Axes')
+        axes(subpIdx)
+    else
+        %subplot(subpSize(1),subpSize(2),subpIdx)
+    end
 end
 set(gcf,'Units','Normal')
 set(gca, 'Visible', 'off')%, 'Position', [0.05 0.05 0.9 0.9]);%,'OuterPosition',[0 0 0 0);
 
 hold on
 patch(xvals', yvals', color', 'Edgecolor', 'none');
-axis equal;
+% axis equal;
 

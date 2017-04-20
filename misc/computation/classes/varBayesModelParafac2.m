@@ -542,19 +542,22 @@ classdef varBayesModelParafac2 < handle
                 
                 generatedData.Ftrue = chol(F);
                 
-                score = zeros(M);
-                score(1,2) = 1;
-                i=0;
-                while any(any(nonzeros(score)>0.8))
-                    C = rand(K,M);
-                    for m1 = 1:M
-                        for m2 = (m1+1):M
-                            score(m1,m2) = congruenceScore(C(:,m1),C(:,m2));
+                if M>1
+                    score = zeros(M);
+                    score(1,2) = 1;
+                    i=0;
+                    while any(any(nonzeros(score)>0.8))
+                        C = rand(K,M);
+                        for m1 = 1:M
+                            for m2 = (m1+1):M
+                                score(m1,m2) = congruenceScore(C(:,m1),C(:,m2));
+                            end
                         end
+                        i = i+1;
                     end
-                    i = i+1;
+                else
+                    C = rand(K,M);
                 end
-                
                 generatedData.Ctrue = 30*C;
                 generatedData.Ptrue = zeros(generatedData.J,generatedData.Mtrue,generatedData.K);
                 generatedData.Etrue = zeros(I,J,K);
