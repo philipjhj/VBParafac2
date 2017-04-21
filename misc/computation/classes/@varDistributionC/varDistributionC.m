@@ -656,7 +656,6 @@ classdef varDistributionC < handle
                 obj.qSigma.MeanLog = log(obj.qSigma.mean);
             end
         end
-        
         function updateqAlpha(obj)
             if strcmp(obj.opts.estimationARD,'avg')
                 obj.qAlpha.alpha(:) = obj.pAlpha.alpha+1/2*obj.data.K;
@@ -665,10 +664,16 @@ classdef varDistributionC < handle
                 obj.qAlpha.mean = obj.data.K./sum(obj.eCsquared,1);
                 obj.qAlpha.MeanLog = log(obj.qAlpha.mean);
             elseif strcmp(obj.opts.estimationARD,'maxNoARD')
-                obj.qAlpha.mean = obj.data.K*obj.data.M./sum(sum(obj.eCsquared,1));
-                obj.qAlpha.MeanLog = log(obj.qAlpha.mean);
+                
+                obj.qAlpha.updateStatistics;
+                [obj.qAlpha.alpha,obj.qAlpha.beta] = hp_update_gamma(...
+                    obj.qAlpha.alpha,obj.qAlpha.beta,obj.qAlpha.mean,obj.qAlpha.MeanLog);
+                
+%                 obj.qAlpha.mean = obj.data.K*obj.data.M./sum(sum(obj.eCsquared,1));
+%                 obj.qAlpha.MeanLog = log(obj.qAlpha.mean);
             elseif strcmp(obj.opts.estimationARD,'avgNoARD')
-                %TODO: implement this
+                obj.qAlpha.alpha = obj.pAlpha.alpha+1/2*obj.data.K*obj.data.M;
+                obj.qAlpha.beta = 1./(1/obj.pAlpha.beta+1/2*sum(sum(obj.eCsquared)));
             end
         end
         

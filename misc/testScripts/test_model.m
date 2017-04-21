@@ -5,9 +5,16 @@ load('/media/data/DataAndResults/Thesis/data/dataBro/Models and data/Apple data/
 %%
 
 warning on MATLAB:nearlySingularMatrix
+
+%%
+
+load('/media/data/DataAndResults/VBParafac2paper/amino.mat')
+data = dataClass;
+data.Xunfolded = permute(reshape(X,DimX),[2 3 1]);
+Mesti=4;
 %%
 % myModel=varBayesModelParafac2;
-rng('default')
+
 I=150;
 J=I;
 K=30;
@@ -29,7 +36,7 @@ options.noiseType = 'homo';
 rng('shuffle')
 % rng(1)
 data = varBayesModelParafac2.generateDataFromModel(options);
-
+%%
 %
 % sumSNR = sumSNR+10*log10(norm(data.Xtrue(:),'fro')^2/norm(data.Etrue(:),'fro')^2);
 % end
@@ -69,7 +76,7 @@ myModel.opts.debugFlag = 2;
 myModel.opts.estimationP= 'parafac2svd';
 % myModel.opts.estimationP = 'vonmises';
 myModel.opts.estimationARD = 'maxNoARD';
-myModel.opts.estimationNoise = 'avg';
+myModel.opts.estimationNoise = 'max';
 myModel.opts.matrixProductPrSlab = 'mtimesx';
 myModel.opts.nActiveComponents = 'threshold';
 myModel.opts.showIter = 1;
@@ -79,6 +86,7 @@ myModel.opts.maxIter = 5000;
 
 myModel.opts.activeParams = {'qC','qP','qA','qF','qAlpha','qSigma'};
 %
+rng('default')
 myModel.partitionData(myModel.fullData.X)
 % tic
 myModel.fitTrainingData;
