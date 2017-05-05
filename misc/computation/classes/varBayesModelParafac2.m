@@ -163,6 +163,7 @@ classdef varBayesModelParafac2 < handle
         function fitTrainingData(obj)
             obj.currentPartition = obj.dataTrain.partitionName;
             
+           
             rng(obj.opts.rngInput);
             obj.qDistTrain.initializeVariationalDististribution;
             

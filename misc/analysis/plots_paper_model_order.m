@@ -4,7 +4,7 @@ savepath = '/media/data/Dropbox/Studie/Kandidat/ThesisPhilipJHJ/code/output/pape
 
 plotType='ELBO'; %{'ELBO','Hinton'};
 
-testName = {'ARD','CV'};
+testName = {'ARD','CV_SharedScale'};
 dataType = 'real';
 % realData = 'Apple';
 realData = 'AminoAcid_amino';
@@ -16,7 +16,7 @@ linetypes={'-','--'};
 noiseType = {'homo','hetero'};
 SNR = 0:-4:-12;
 
-Ms = 2:10;
+Ms = 1:10;
 M = numel(Ms);
 T = 5;
 
@@ -50,7 +50,7 @@ for testIdx = 2:2
             for noiseIdx = 1:N
                 for SNRIdx = 1:S
                     ELBOs = zeros(M,T);
-                    for m = 1:M
+                    for m = 2:M
                         if strcmp(dataType,'sim')
                             filename = strcat('/media/data/DataAndResults/VBParafac2paper/results_paper/',testName{testIdx},'_',dataType,'_data__dim_150_150_30_4_04__pMethod_',pMethod{pMethodIdx},'_SNR_',...
                                 num2str(SNR(SNRIdx)),'_noiseType_',noiseType{noiseIdx},'_mEstimate_',num2str(Ms(m)),'_datasetRNG_1.mat');
@@ -92,8 +92,8 @@ for testIdx = 2:2
                         
                         if strcmp(dataType,'real')
                             load(filenameDF);
-                            allCCDnFit(m,1,SNRIdx,noiseIdx) = myModel{m}.CCDParafac2;
-                            allCCDnFit(m,2,SNRIdx,noiseIdx) = myModel{m}.Parafac2Fit;
+                            allCCDnFit(m,1,SNRIdx,noiseIdx) = myModel{m-1}.CCDParafac2;
+                            allCCDnFit(m,2,SNRIdx,noiseIdx) = myModel{m-1}.Parafac2Fit;
                         end
                     end
                     if strcmp('ARD',testName{testIdx})
@@ -110,7 +110,7 @@ for testIdx = 2:2
                         hold on
                         
                         
-                        plot(Ms(v<0),v(v<0),linetypes{1},'Color',colors(SNRIdx),'Marker',markers(pMethodIdx),'lineWidth',2,...
+                        plot(Ms,v,linetypes{1},'Color',colors(SNRIdx),'Marker',markers(pMethodIdx),'lineWidth',2,...
                             'markersize',15);
                         if pMethodIdx==2 % Remove when Direct exist for AMINO
 %                         yyaxis left

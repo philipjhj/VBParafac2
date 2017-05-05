@@ -57,19 +57,26 @@ normalModel=myModel{2}
 % load('/media/data/DataAndResults/VBParafac2paper/results_paper/ARD_real_data__AminoAcid_amino__pMethod_vonmises_mEsti_3.mat')
 % close all
 % load('/media/data/DataAndResults/VBParafac2paper/results_paper/long_ARD_real_data__AminoAcid_amino__pMethod_vonmises_mEsti_3.mat')
-% load('/media/data/DataAndResults/VBParafac2paper/results_paper/long_ARD_real_data_    _AminoAcid_amino__pMethod_parafac2svd_mEsti_3.mat')
-
-
-for t=1:10
-    ELBO(t)=myModel{2}{t}.dataTrain.ELBO;
+% load('/media/data/DataAndResults/VBParafac2paper/results_paper/long_ARD_real_data__AminoAcid_amino__pMethod_parafac2svd_mEsti_3.mat')
+% load('/media/data/DataAndResults/VBParafac2paper/results_paper/SharedScale_real_data__AminoAcid_amino__pMethod_parafac2svd_mEsti_3.mat')
+% load('/media/data/DataAndResults/VBParafac2paper/results_paper/SharedScale_real_data__AminoAcid_amino__pMethod_vonmises_mEsti_3.mat')
+% load('/media/data/DataAndResults/VBParafac2paper/results_paper/CV_SharedScale_real_data__AminoAcid_amino__pMethod_vonmises_mEsti_3.mat')
+m=3;
+T=50
+ELBO=[]
+for t=1:T
+    ELBO(t)=myModel{m}{t}.dataTrain.ELBO;
 end
 ELBO
 
 [~,idx]=max(ELBO)
-diff(myModel{2}{idx}.dataTrain.ELBO_chain(end-1:end))
+% diff(myModel{m}{idx}.dataTrain.ELBO_chain(end-1:end))
 %%
 
-CC=corrcoef([myModel{2}{idx}.qDistTrain.qC.mean y]);
+bestVBmodel=myModel;
+% bestVBmodel=myModel{m}{idx};
+
+CC=corrcoef([bestVBmodel.qDistTrain.qC.mean y]);
 CC=abs(CC(1:3,4:end));
 
 [~,IDXs]=max(CC);

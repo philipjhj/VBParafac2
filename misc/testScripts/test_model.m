@@ -11,13 +11,13 @@ warning on MATLAB:nearlySingularMatrix
 load('/media/data/DataAndResults/VBParafac2paper/amino.mat')
 data = dataClass;
 data.Xunfolded = permute(reshape(X,DimX),[2 3 1]);
-Mesti=4;
+Mesti=3;
 %%
 % myModel=varBayesModelParafac2;
 
 I=150;
 J=I;
-K=30;
+K=10;
 M=4;
 Mesti = M;
 
@@ -36,7 +36,7 @@ options.noiseType = 'homo';
 rng('shuffle')
 % rng(1)
 data = varBayesModelParafac2.generateDataFromModel(options);
-%%
+
 %
 % sumSNR = sumSNR+10*log10(norm(data.Xtrue(:),'fro')^2/norm(data.Etrue(:),'fro')^2);
 % end
@@ -52,7 +52,7 @@ data = varBayesModelParafac2.generateDataFromModel(options);
 % normalModel = normalParafac2(data.X);
 % normalModel = normalParafac2(permute(I2,[2 1 3]));
 
-% 
+%%
 % for m = 2:5
 %     rng('default')
 %normalModel.fitParafac2(3)
@@ -71,22 +71,23 @@ myModel=varBayesModelParafac2(data,Mesti);
 %
 % myModel=varBayesModelParafac2(Y,100);
 
-myModel.opts.verbose = 1;
-myModel.opts.debugFlag = 2;
+myModel.opts.verbose = 0;
+myModel.opts.debugFlag = 0;
 myModel.opts.estimationP= 'parafac2svd';
 % myModel.opts.estimationP = 'vonmises';
 myModel.opts.estimationARD = 'maxNoARD';
 myModel.opts.estimationNoise = 'max';
 myModel.opts.matrixProductPrSlab = 'mtimesx';
 myModel.opts.nActiveComponents = 'threshold';
-myModel.opts.showIter = 1;
-% myModel.opts.rngInput = 1;
-myModel.opts.maxIter = 5000;
+myModel.opts.showIter = 10;
+myModel.opts.rngInput = 31; % bad ones: 8, good ones: 15, 16, 19, 21, CORRECT: 31
+myModel.opts.maxIter = 1000;
 % myModel.opts.maxTime = 4;
 
 myModel.opts.activeParams = {'qC','qP','qA','qF','qAlpha','qSigma'};
-%
+%%
 rng('default')
+rng(1)
 myModel.partitionData(myModel.fullData.X)
 % tic
 myModel.fitTrainingData;
@@ -94,7 +95,7 @@ myModel.fitTrainingData;
 
 % myModel.opts.activeParams = {'qA','qC','qP','qSigma','qF'};
 %%
-Ms = 2:2
+Ms = 1:7
 myModel.crossValidateM(Ms)
 %%
 
