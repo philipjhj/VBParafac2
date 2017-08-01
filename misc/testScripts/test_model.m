@@ -8,17 +8,17 @@ warning on MATLAB:nearlySingularMatrix
 
 %%
 
-load('/media/data/DataAndResults/VBParafac2paper/amino.mat')
+load('/media/data/DataAndResults/VBParafac2paper/data/aminoAcid/amino.mat')
 data = dataClass;
 data.Xunfolded = permute(reshape(X,DimX),[2 3 1]);
 Mesti=3;
 %%
 % myModel=varBayesModelParafac2;
 
-I=150;
+I=20;
 J=I;
-K=10;
-M=4;
+K=4;
+M=2;
 Mesti = M;
 
 options.dimensions = [I J K M];
@@ -27,7 +27,7 @@ options.initMethod = 'kiers';
 options.congruence = 0.4;
 % 1e4 1e-3 i ARD tests
 options.precision = [1e2 1e-6];
-options.SNR = 5;
+options.SNR = -4;
 options.noiseType = 'homo';
 % [1e4 1e-8] creates problems for qC
 
@@ -54,7 +54,7 @@ data = varBayesModelParafac2.generateDataFromModel(options);
 
 %%
 % for m = 2:5
-%     rng('default')
+    rng('default')
 %normalModel.fitParafac2(3)
 %
 % normalModel.CCDParafac2
@@ -71,31 +71,33 @@ myModel=varBayesModelParafac2(data,Mesti);
 %
 % myModel=varBayesModelParafac2(Y,100);
 
-myModel.opts.verbose = 0;
+myModel.opts.verbose = 1;
 myModel.opts.debugFlag = 0;
 myModel.opts.estimationP= 'parafac2svd';
 % myModel.opts.estimationP = 'vonmises';
-myModel.opts.estimationARD = 'maxNoARD';
-myModel.opts.estimationNoise = 'max';
+myModel.opts.estimationARD = 'max';
+myModel.opts.estimationNoise = 'maxShared';
+myModel.opts.initMethod = 'mle';
 myModel.opts.matrixProductPrSlab = 'mtimesx';
 myModel.opts.nActiveComponents = 'threshold';
-myModel.opts.showIter = 10;
-myModel.opts.rngInput = 31; % bad ones: 8, good ones: 15, 16, 19, 21, CORRECT: 31
-myModel.opts.maxIter = 1000;
+myModel.opts.showIter = 1;
+% myModel.opts.rngInput = 15; % bad ones: 8, good ones: 15, 16, 19, 21, CORRECT: 31
+myModel.opts.maxIter = 5000;
 % myModel.opts.maxTime = 4;
 
 myModel.opts.activeParams = {'qC','qP','qA','qF','qAlpha','qSigma'};
 %%
 rng('default')
-rng(1)
+% rng(1)
 myModel.partitionData(myModel.fullData.X)
 % tic
 myModel.fitTrainingData;
-% toc
+% toc 
 
 % myModel.opts.activeParams = {'qA','qC','qP','qSigma','qF'};
 %%
-Ms = 1:7
+Ms = 1:5
+rng('default')
 myModel.crossValidateM(Ms)
 %%
 
@@ -110,7 +112,7 @@ squeeze(mean(max(myModel.CV_ELBOS,[],2)))-best_ELBO_true
 (squeeze(mean(max(myModel.CV_ELBOS,[],2)))-best_ELBO_true)/best_ELBO_true
 
 %%
-best_ELBO_all = squeeze(mean(max(myModel.CV_ELBOS,[],2)));
+best_ELBO_all = squeeze(mean(max(myModel.CV_ELBOS_test,[],2)));
 plot(Ms,best_ELBO_all,'o-')
 xlabel('# of components')
 ylabel('ELBO')

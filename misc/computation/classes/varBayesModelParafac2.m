@@ -164,7 +164,6 @@ classdef varBayesModelParafac2 < handle
         function fitTrainingData(obj)
             obj.currentPartition = obj.dataTrain.partitionName;
             
-           
             rng(obj.opts.rngInput);
             obj.qDistTrain.initializeVariationalDististribution;
             
@@ -366,47 +365,13 @@ classdef varBayesModelParafac2 < handle
                 fprintf('\n')
             end
         end
-        
-        function obj = compute_reconstruction(obj)
-            
-            obj.data.Xrecon_m = zeros(obj.data.I,obj.data.J,obj.data.K,obj.data.M);
-            
-            A = obj.qDistTrain.qA.mean;
-            D = obj.qDistTrain.eD;
-            F = obj.qDistTrain.qF.mean;
-            P = obj.qDistTrain.qP.mean;
-            
-            for m = 1:obj.data.M
-                obj.data.Xrecon_m(:,:,:,m) = obj.util.matrixProductPrSlab(...
-                    obj.util.matrixProductPrSlab(obj.util.matrixProductPrSlab(...
-                    A(:,m),D(m,m,:)),F(:,m)'),permute(P,[2 1 3]));
+      
+        function xRecon = computeReconstructedData(obj)
+            xRecon = zeros(obj.dataTrain.I,obj.dataTrain.J,obj.dataTrain.K);
+            for k = 1:obj.dataTrain.K
+                xRecon(:,:,k) = obj.qDistTrain.qA.mean*diag(obj.qDistTrain.qC.mean(k,:))*obj.qDistTrain.qF.mean'*obj.qDistTrain.qP.mean(:,:,k)';
             end
-            
-            obj.data.Xrecon = sum(obj.data.Xrecon_m,4);
-            
-            if ~isempty(obj.data.Xtrue) && isempty(obj.data.Xtrue_m)
-                
-                obj.data.Xtrue_m = zeros(obj.data.I,obj.data.J,obj.data.K,obj.data.M);
-                
-                A = obj.data.Atrue;
-                D = bsxfun(@mtimes,reshape(obj.data.Ctrue',1,...
-                    obj.data.Mtrue,obj.data.K),...
-                    repmat(eye(obj.data.Mtrue),1,1,obj.data.K));
-                F = obj.data.Ftrue;
-                P = obj.data.Ptrue;
-                
-                for m = 1:obj.data.Mtrue
-                    obj.data.Xtrue_m(:,:,:,m) = obj.util.matrixProductPrSlab(...
-                        obj.util.matrixProductPrSlab(obj.util.matrixProductPrSlab(...
-                        A(:,m),D(m,m,:)),F(:,m)'),permute(P,[2 1 3]));
-                end
-                
-                
-            end
-            
         end
-        
-        
         
         % #### Plot functions
         function plotSolutionSynthK(obj,k,MLEflag)

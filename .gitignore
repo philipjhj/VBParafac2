@@ -1,12 +1,4 @@
 # ignore data files
-# /Data
-# /associationMiningTraditional
-/output
-/Notes
-/HPCscripts
-# /UnderstandScripts
-# /profile_results
-
 *~
 /other
 .fuse_hidden*

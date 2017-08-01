@@ -140,6 +140,10 @@ classdef dataClass < handle
             %             obj.startCpuTime
         end
         
+        function values = relativeDiffErrorIters(obj)
+            relDiff=(diff(obj.ELBOall)./abs(obj.ELBOall(2:end)));
+            values=relDiff(relDiff<-1e-12);
+        end
     end
     
     methods (Static)

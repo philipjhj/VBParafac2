@@ -315,9 +315,7 @@ classdef varDistributionC < handle
                 obj.computeqCMeanLog;
             end
             
-            
-            
-            % No expected value if hyperparameter are maximized
+            % No expected value if parameter are maximized
             if strcmp(obj.opts.estimationNoise,'max2')
                 obj.qSigmaMeanLog = 0;
             end

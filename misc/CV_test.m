@@ -32,6 +32,9 @@ elseif strcmp(test_data,'real')
     
 end
 
+
+myModel=varBayesModelParafac2(data,Mesti);
+
 myModel.opts.verbose = 0;
 myModel.opts.debugFlag = 0;
 myModel.opts.estimationP= 'parafac2svd';
@@ -47,6 +50,6 @@ myModel.opts.maxIter = 1000;
 
 myModel.opts.activeParams = {'qC','qP','qA','qF','qAlpha','qSigma'};
 
-% rng('default')
+rng('default')
 Ms = 1:7
 myModel.crossValidateM(Ms)

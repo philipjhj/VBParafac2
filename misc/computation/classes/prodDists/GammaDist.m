@@ -20,7 +20,7 @@ classdef GammaDist < probabilityDist
                 obj.beta = 1*ones(obj.arrayDim);
             elseif strcmpi(varname(2:end),'Sigma')
                 obj.alpha = 1*ones(obj.arrayDim);
-                obj.beta = 1e3*ones(obj.arrayDim);
+                obj.beta = 1e32*ones(obj.arrayDim);
             end
             
         end
