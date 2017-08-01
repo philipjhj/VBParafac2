@@ -109,20 +109,26 @@ classdef varDistributionC < handle
             obj.pAlpha = GammaDist('pAlpha',[1 1]);
             
             
-            %Start in MLE Parafac2 solution
-            if strcmp(obj.data.partitionName,'Test')
-               X = {obj.data.X};
-            else
-               X = obj.data.X;
+            
+            if strcmpi(obj.opts.initMethod,'mle')
+
+                % Start in MLE Parafac2 solution
+                if strcmp(obj.data.partitionName,'Test')
+                    X = {obj.data.X};
+                else
+                    X = obj.data.X;
+                end
+                [A,F,C,P,modelFit]=parafac2(X,obj.data.M,[0 0],[0 0 0 0 1]);
+                noise=0;
+                obj.qA.mean = A+noise*randn(size(A));
+                obj.qF.mean = F+noise*randn(size(F));
+                obj.qC.mean = C+noise*randn(size(C));
+                P=cat(3,P{:});
+                obj.qP.mean = bsxfun(@plus,P,noise*randn(size(P,1),size(P,2)));
+                
+                rng('default')
             end
-                        [A,F,C,P,modelFit]=parafac2(X,obj.data.M,[0 0],[0 0 0 0 1]);
-                        noise=0;
-                        obj.qA.mean = A+noise*randn(size(A));
-                        obj.qF.mean = F+noise*randn(size(F));
-                        obj.qC.mean = C+noise*randn(size(C));
-                        P=cat(3,P{:});
-                        obj.qP.mean = bsxfun(@plus,P,noise*randn(size(P,1),size(P,2)));
-             rng('default')
+            
             if strcmpi(obj.opts.matrixProductPrSlab,'gpu')
                 obj.qA.mean = gpuArray(obj.qA.mean);
                 obj.qA.variance = gpuArray(obj.qA.variance);

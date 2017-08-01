@@ -11,6 +11,8 @@ classdef optionsClass < handle
         maxTime = realmax;
         
         
+        initMethod='random'
+        
         % qDist options (with default options)
         estimationARD ='max'; % max or avg
         estimationNoise ='avg'; % max or avg
