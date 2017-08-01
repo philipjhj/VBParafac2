@@ -378,14 +378,17 @@ classdef varDistributionC < handle
             obj.qAMeanLog = -obj.qA.I*obj.qA.J*log(2*pi)/2-1/2*obj.qA.meanInnerProductSumComponent;
         end
         function computeqCMeanLog(obj)
-%             if isempty(obj.qAlpha.entropy) && strcmp(obj.opts.estimationARD,'avg')
-%                 obj.qAlpha.updateStatistics;
-%             end
-            obj.qCMeanLog = -obj.data.K*obj.data.M*log(2*pi)/2+...
-                obj.data.K*obj.data.M/2*sum(obj.qAlpha.MeanLog)-1/2*(...
-                trace(obj.eAlphaDiag*sum(obj.qC.variance,3))+...
-                sum(sum(obj.qC.mean.^2,1).*obj.qAlpha.mean));
-            
+            if strcmpi(obj.opts.estimationARD,'maxNoARD')
+                obj.qCMeanLog = -obj.data.K*obj.data.M*log(2*pi)/2+...
+                    obj.data.K*obj.data.M/2*sum(obj.qAlpha.MeanLog)-1/2*(...
+                    sum(sum(obj.eAlphaDiag.*sum(obj.qC.variance,3)))+...
+                    sum(sum(obj.qC.mean.^2,1).*obj.qAlpha.mean));
+            else
+                obj.qCMeanLog = -obj.data.K*obj.data.M*log(2*pi)/2+...
+                    obj.data.K/2*sum(obj.qAlpha.MeanLog)-1/2*(...
+                    sum(sum(obj.eAlphaDiag.*sum(obj.qC.variance,3)))+...
+                    sum(sum(obj.qC.mean.^2,1).*obj.qAlpha.mean));
+            end
         end
         function computeqFMeanLog(obj)
             obj.qFMeanLog = -obj.qF.I*obj.qF.J*log(2*pi)/2-1/2*obj.qF.meanInnerProductSumComponent;
@@ -407,10 +410,17 @@ classdef varDistributionC < handle
             end
         end
         function computeqAlphaMeanLog(obj)
-            obj.qAlphaMeanLog = obj.data.M*...
-                log(1/(gamma(obj.pAlpha.alpha)*obj.pAlpha.beta^obj.pAlpha.alpha))+...
-                obj.data.M*sum((obj.pAlpha.alpha-1)*...
-                obj.qAlpha.MeanLog-obj.qAlpha.mean.*1/obj.pAlpha.beta);
+            if strcmpi(obj.opts.estimationARD,'maxNoARD')
+                obj.qAlphaMeanLog = obj.data.M*...
+                    log(1/(gamma(obj.pAlpha.alpha)*obj.pAlpha.beta^obj.pAlpha.alpha))+...
+                    obj.data.M*sum((obj.pAlpha.alpha-1)*...
+                    obj.qAlpha.MeanLog-obj.qAlpha.mean.*1/obj.pAlpha.beta);
+            else
+                obj.qAlphaMeanLog = obj.data.M*...
+                    log(1/(gamma(obj.pAlpha.alpha)*obj.pAlpha.beta^obj.pAlpha.alpha))+...
+                    sum((obj.pAlpha.alpha-1)*...
+                    obj.qAlpha.MeanLog-obj.qAlpha.mean.*1/obj.pAlpha.beta);
+            end
         end
         
         % #################################################################
@@ -468,9 +478,6 @@ classdef varDistributionC < handle
                 if strcmp(obj.opts.estimationARD,'max')
                     obj.qAlpha.mean = obj.data.K./sum(obj.eCsquared,1);
                     obj.qAlpha.MeanLog = log(obj.qAlpha.mean);
-                elseif strcmp(obj.opts.estimationARD,'maxNoARD')
-%                     obj.qAlpha.mean = obj.data.K*obj.data.M./sum(sum(obj.eCsquared,1));
-%                     obj.qAlpha.MeanLog = log(obj.qAlpha.mean);
                 end
             end
             
@@ -711,13 +718,8 @@ classdef varDistributionC < handle
                 obj.qAlpha.mean = obj.data.K./sum(obj.eCsquared,1);
                 obj.qAlpha.MeanLog = log(obj.qAlpha.mean);
             elseif strcmp(obj.opts.estimationARD,'maxNoARD')
-                
-                %obj.qAlpha.updateStatistics;
                 [obj.qAlpha.alpha,obj.qAlpha.beta] = hp_update_gamma(...
                     obj.qAlpha.alpha,obj.qAlpha.beta,obj.qAlpha.mean,obj.qAlpha.MeanLog);
-                
-                %                 obj.qAlpha.mean = obj.data.K*obj.data.M./sum(sum(obj.eCsquared,1));
-                %                 obj.qAlpha.MeanLog = log(obj.qAlpha.mean);
             elseif strcmp(obj.opts.estimationARD,'avgNoARD')
                 obj.qAlpha.alpha = obj.pAlpha.alpha+1/2*obj.data.K*obj.data.M;
                 obj.qAlpha.beta = 1./(1/obj.pAlpha.beta+1/2*sum(sum(obj.eCsquared)));
