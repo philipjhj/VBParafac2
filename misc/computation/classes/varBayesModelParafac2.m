@@ -23,7 +23,8 @@ classdef varBayesModelParafac2 < handle
         currentData
         currentqDist
         
-        testParameters = {'qP','qC','qSigma'};
+        testParametersHeteroscedastic = {'qP','qC','qSigma'};
+        testParametersHomoscedastic = {'qP','qC'};
         
         ListenerPartitionUpdates
     end
@@ -176,8 +177,13 @@ classdef varBayesModelParafac2 < handle
             
             trainParameters = obj.opts.activeParams;
             
-            obj.opts.activeParams = obj.testParameters(ismember(obj.testParameters,obj.opts.activeParams));
-            
+            if ~isempty(strfind(obj.opts.estimationNoise,'Shared'))% Shared
+                obj.opts.activeParams = obj.testParametersHomoscedastic(...
+                    ismember(obj.testParametersHomoscedastic,obj.opts.activeParams));
+            else
+                obj.opts.activeParams = obj.testParametersHeteroscedastic(...
+                    ismember(obj.testParametersHeteroscedastic,obj.opts.activeParams));
+            end
             obj.qDistTest.qA = obj.qDistTrain.qA;
             obj.qDistTest.qF = obj.qDistTrain.qF;
             obj.qDistTest.qAlpha = obj.qDistTrain.qAlpha;
