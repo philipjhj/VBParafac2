@@ -457,10 +457,18 @@ classdef varDistributionC < handle
         end
         
         function updateVariationalFactor(obj,variationalFactorName)
-            if ~ismember(variationalFactorName,{'qSigma','qAlpha'}) || obj.data.iter>=obj.opts.NoiseAndScaleLearningDelay || strcmp(obj.data.partitionName,'Test')
+            if ~ismember(variationalFactorName,{'qSigma','qAlpha'}) || ...
+                    obj.testIfHyperparameterLearningActive(variationalFactorName) ...
+                    || strcmp(obj.data.partitionName,'Test')
                 obj.(strcat('update',variationalFactorName));
                 obj.updateStatistics({variationalFactorName})
             end
+        end
+        function bool=testIfHyperparameterLearningActive(obj,variationalFactorName)
+            bool=obj.data.iter>=obj.opts.noiseLearningDelay && ...
+                strcmpi(variationalFactorName,'qSigma') ...
+                || obj.data.iter>=obj.opts.scaleLearningDelay && ...
+                strcmpi(variationalFactorName,'qAlpha');
         end
         
         function updateStatistics(obj,variationalFactorNames)

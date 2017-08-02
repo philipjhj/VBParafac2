@@ -10,7 +10,8 @@ classdef optionsClass < handle
         maxIter = intmax;
         maxTime = realmax;
         initMethod='random'
-        NoiseAndScaleLearningDelay=0
+        noiseLearningDelay=0
+        scaleLearningDelay=0
         
         % qDist options (with default options)
         estimationARD ='max'; % max or avg

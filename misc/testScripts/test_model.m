@@ -78,6 +78,9 @@ myModel.opts.estimationP= 'parafac2svd';
 myModel.opts.estimationARD = 'max';
 myModel.opts.estimationNoise = 'maxShared';
 myModel.opts.initMethod = 'mle';
+myModel.opts.noiseLearningDelay=20;
+myModel.opts.scaleLearningDelay=10;
+
 myModel.opts.matrixProductPrSlab = 'mtimesx';
 myModel.opts.nActiveComponents = 'threshold';
 myModel.opts.showIter = 1;
