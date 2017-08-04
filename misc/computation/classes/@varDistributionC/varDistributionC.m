@@ -376,6 +376,9 @@ classdef varDistributionC < handle
             obj.qAMeanLog = -obj.qA.I*obj.qA.J*log(2*pi)/2-1/2*obj.qA.meanInnerProductSumComponent;
         end
         function computeqCMeanLog(obj)
+            if isempty(obj.eAlphaDiag)
+                obj.compute_eAlphaDiag
+            end
             if strcmpi(obj.opts.estimationARD,'maxNoARD')
                 obj.qCMeanLog = -obj.data.K*obj.data.M*log(2*pi)/2+...
                     obj.data.K*obj.data.M/2*sum(obj.qAlpha.MeanLog)-1/2*(...
