@@ -93,17 +93,7 @@ classdef varDistributionC < handle
             obj.qF = multiNormalDist('qF',[obj.data.M obj.data.M],false,obj.util);
             obj.qP = multiNormalDist('qP',[obj.data.J obj.data.M obj.data.K],true,obj.util);
             obj.qSigma = GammaDist('qSigma',[1 obj.data.K]);
-            if strcmp(obj.opts.estimationARD,'maxNoARD')
-                obj.qAlpha = GammaDist('qAlpha',[1 1]);
-            else
-                obj.qAlpha = GammaDist('qAlpha',[1 obj.data.M]);
-            end
-            
-            if strcmp(obj.opts.estimationNoise(4:end),'Shared')
-                obj.qSigma = GammaDist('qSigma',[1 1]);
-            else
-                obj.qSigma = GammaDist('qSigma',[1 obj.data.K]);
-            end
+            obj.qAlpha = GammaDist('qAlpha',[1 obj.data.M]);
             
             obj.pSigma = GammaDist('pSigma',[1 1]);
             obj.pAlpha = GammaDist('pAlpha',[1 1]);
@@ -265,12 +255,8 @@ classdef varDistributionC < handle
                     obj.qFMeanLog+obj.qPMeanLog+obj.qSigmaMeanLog+...
                     obj.qAlphaMeanLog;
             elseif strcmp(obj.data.partitionName,'Test')
-                if isempty(strfind(obj.opts.estimationNoise,'Shared'))
-                    value = obj.qXMeanLog+obj.qCMeanLog+...
-                        obj.qPMeanLog+obj.qSigmaMeanLog;
-                else
-                    value = obj.qXMeanLog+obj.qCMeanLog+obj.qPMeanLog;
-                end
+                value = obj.qXMeanLog+obj.qCMeanLog+...
+                    obj.qPMeanLog+obj.qSigmaMeanLog;
             end
             %             fprintf('%f \n',[obj.qXMeanLog,obj.qAMeanLog,obj.qCMeanLog,...
             %                     obj.qFMeanLog,obj.qPMeanLog,obj.qSigmaMeanLog,...
@@ -284,12 +270,8 @@ classdef varDistributionC < handle
                 value = obj.qAEntropy+obj.qCEntropy+obj.qFEntropy+...
                     obj.qPEntropy+obj.qSigmaEntropy+obj.qAlphaEntropy;
             elseif strcmp(obj.data.partitionName,'Test')
-                if isempty(strfind(obj.opts.estimationNoise,'Shared'))
-                    value = obj.qCEntropy+...
-                        obj.qPEntropy+obj.qSigmaEntropy;
-                else
-                    value = obj.qCEntropy+obj.qPEntropy;
-                end
+                value = obj.qCEntropy+...
+                    obj.qPEntropy+obj.qSigmaEntropy;
             end
             %fprintf('%f \n%',[obj.qAEntropy,obj.qCEntropy,obj.qFEntropy,...
             %        obj.qPEntropy,obj.qSigmaEntropy,obj.qAlphaEntropy])
@@ -398,17 +380,10 @@ classdef varDistributionC < handle
             obj.qPMeanLog = -obj.qP.I*obj.qP.J*obj.qP.K*log(2*pi)/2-1/2*obj.qP.meanInnerProductSumComponent;
         end
         function computeqSigmaMeanLog(obj)
-            if strcmpi(obj.opts.estimationNoise(4:end),'Shared')
-                obj.qSigmaMeanLog = obj.data.K*...
-                    log(1/(gamma(obj.pSigma.alpha)*obj.pSigma.beta^obj.pSigma.alpha))+...
-                    obj.data.K*sum((obj.pSigma.alpha-1).*...
-                    obj.qSigma.MeanLog-obj.qSigma.mean.*1/obj.pSigma.beta);
-            else
-                obj.qSigmaMeanLog = obj.data.K*...
-                    log(1/(gamma(obj.pSigma.alpha)*obj.pSigma.beta^obj.pSigma.alpha))+...
-                    sum((obj.pSigma.alpha-1).*...
-                    obj.qSigma.MeanLog-obj.qSigma.mean.*1/obj.pSigma.beta);
-            end
+            obj.qSigmaMeanLog = obj.data.K*...
+                log(1/(gamma(obj.pSigma.alpha)*obj.pSigma.beta^obj.pSigma.alpha))+...
+                sum((obj.pSigma.alpha-1).*...
+                obj.qSigma.MeanLog-obj.qSigma.mean.*1/obj.pSigma.beta);
         end
         function computeqAlphaMeanLog(obj)
             if strcmpi(obj.opts.estimationARD,'maxNoARD')
