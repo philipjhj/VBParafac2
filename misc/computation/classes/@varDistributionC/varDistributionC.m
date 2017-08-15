@@ -511,7 +511,7 @@ classdef varDistributionC < handle
                 obj.eA))),1)),...
                 obj.qC.variance))';
             
-            if size(obj.qC.mean,1) == 1
+            if size(obj.qC.mean,2) == 1
                 obj.qC.mean = obj.qC.mean';
             end
         end
