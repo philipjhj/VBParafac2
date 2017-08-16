@@ -373,17 +373,10 @@ classdef varDistributionC < handle
                 obj.qSigma.MeanLog-obj.qSigma.mean.*1/obj.pSigma.beta);
         end
         function computeqAlphaMeanLog(obj)
-            if strcmpi(obj.opts.estimationARD,'maxNoARD')
-                obj.qAlphaMeanLog = obj.data.M*...
-                    log(1/(gamma(obj.pAlpha.alpha)*obj.pAlpha.beta^obj.pAlpha.alpha))+...
-                    obj.data.M*sum((obj.pAlpha.alpha-1)*...
-                    obj.qAlpha.MeanLog-obj.qAlpha.mean.*1/obj.pAlpha.beta);
-            else
-                obj.qAlphaMeanLog = obj.data.M*...
-                    log(1/(gamma(obj.pAlpha.alpha)*obj.pAlpha.beta^obj.pAlpha.alpha))+...
-                    sum((obj.pAlpha.alpha-1)*...
-                    obj.qAlpha.MeanLog-obj.qAlpha.mean.*1/obj.pAlpha.beta);
-            end
+            obj.qAlphaMeanLog = obj.data.M*...
+                log(1/(gamma(obj.pAlpha.alpha)*obj.pAlpha.beta^obj.pAlpha.alpha))+...
+                sum((obj.pAlpha.alpha-1)*...
+                obj.qAlpha.MeanLog-obj.qAlpha.mean.*1/obj.pAlpha.beta);
         end
         
         % #################################################################
@@ -709,11 +702,7 @@ classdef varDistributionC < handle
             end
         end
         function compute_eD(obj)
-            if obj.data.K>1
-                obj.eD = obj.util.matrixDiagonalPrSlab(obj.qC.mean');
-            else
-                obj.eD = diag(obj.qC.mean);
-            end
+            obj.eD = obj.util.matrixDiagonalPrSlab(obj.qC.mean');
         end
         function compute_eA(obj,r0)
             % Expectation of A w.r.t. mode r0
