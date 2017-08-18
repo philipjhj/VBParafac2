@@ -38,7 +38,6 @@ classdef varDistributionC < handle
         
         % Shared terms between moments
         
-        eAlphaDiag
         eFtPt
         eDeAtXk
         eDeAtXkeFtPtTrace
@@ -130,7 +129,6 @@ classdef varDistributionC < handle
         
         % TODO: Refactor SufficientStatistics into seperate class?
         function updateSufficientStatistics(obj)
-            obj.compute_eAlphaDiag;
             obj.compute_eA;
             obj.compute_eAtA;
             obj.compute_eD;
@@ -213,8 +211,6 @@ classdef varDistributionC < handle
                 obj.compute_eAiDFtPtPFDAi;
                 obj.compute_eDeAtXk;
                 obj.compute_eDeAtXkeFtPtTrace;
-            elseif strcmp(VariationalFactorName,'qAlpha')
-                obj.compute_eAlphaDiag;
             end
         end
         
@@ -456,7 +452,7 @@ classdef varDistributionC < handle
                 obj.util.transformToTensor(obj.qSigma.mean),...
                 obj.util.hadamardProductPrSlab(obj.eAtA,...
                 obj.eFtPtPF))...
-                ,obj.eAlphaDiag));
+                ,diag(obj.qAlpha.mean)));
             
             obj.qC.mean=squeeze(obj.util.matrixProductPrSlab(...
                 obj.util.hadamardProductPrSlab(...
@@ -639,13 +635,6 @@ classdef varDistributionC < handle
         % # Shared Terms
         
         % ## First order
-        function compute_eAlphaDiag(obj)
-            if ismatrix(obj.qAlpha.mean)
-                obj.eAlphaDiag = diag(obj.qAlpha.mean);
-            else
-                obj.eAlphaDiag = eye(obj.data.M)*obj.qAlpha.mean;
-            end
-        end
         function compute_eD(obj)
             obj.eD = obj.util.matrixDiagonalPrSlab(obj.qC.mean');
         end
