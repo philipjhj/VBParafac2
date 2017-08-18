@@ -98,27 +98,6 @@ classdef varDistributionC < handle
             obj.pSigma = GammaDist('pSigma',[1 1]);
             obj.pAlpha = GammaDist('pAlpha',[1 1]);
             
-            
-            
-            if strcmpi(obj.opts.initMethod,'mle')
-
-                % Start in MLE Parafac2 solution
-                if strcmp(obj.data.partitionName,'Test')
-                    X = {obj.data.X};
-                else
-                    X = obj.data.X;
-                end
-                [A,F,C,P,modelFit]=parafac2(X,obj.data.M,[0 0],[0 0 0 0 1]);
-                noise=0;
-                obj.qA.mean = A+noise*randn(size(A));
-                obj.qF.mean = F+noise*randn(size(F));
-                obj.qC.mean = C+noise*randn(size(C));
-                P=cat(3,P{:});
-                obj.qP.mean = bsxfun(@plus,P,noise*randn(size(P,1),size(P,2)));
-                
-                rng('default')
-            end
-            
             if strcmpi(obj.opts.matrixProductPrSlab,'gpu')
                 obj.qA.mean = gpuArray(obj.qA.mean);
                 obj.qA.variance = gpuArray(obj.qA.variance);
@@ -244,7 +223,6 @@ classdef varDistributionC < handle
         
         function value = get.ELBO(obj)
             value = gather(obj.ePxz+obj.eQz);
-            %  fprintf('%f \n',[obj.ePxz,obj.eQz]);
         end
         
         function value = get.ePxz(obj)
@@ -258,10 +236,6 @@ classdef varDistributionC < handle
                 value = obj.qXMeanLog+obj.qCMeanLog+...
                     obj.qPMeanLog+obj.qSigmaMeanLog;
             end
-            %             fprintf('%f \n',[obj.qXMeanLog,obj.qAMeanLog,obj.qCMeanLog,...
-            %                     obj.qFMeanLog,obj.qPMeanLog,obj.qSigmaMeanLog,...
-            %                     obj.qAlphaMeanLog])
-            %               fprintf('----\n')
         end
         function value = get.eQz(obj)
             obj.computeEntropyValues(obj.opts.activeParams)
@@ -273,8 +247,6 @@ classdef varDistributionC < handle
                 value = obj.qCEntropy+...
                     obj.qPEntropy+obj.qSigmaEntropy;
             end
-            %fprintf('%f \n%',[obj.qAEntropy,obj.qCEntropy,obj.qFEntropy,...
-            %        obj.qPEntropy,obj.qSigmaEntropy,obj.qAlphaEntropy])
         end
         
         function computeMeanLogValues(obj,variationalFactorNames)
@@ -297,8 +269,8 @@ classdef varDistributionC < handle
                 obj.computeqCMeanLog;
             end
             
-            % No expected value if parameter are maximized
-            if strcmp(obj.opts.estimationNoise,'max2')
+            % No expected value if hyperparameter are maximized
+            if strcmp(obj.opts.estimationNoise,'max')
                 obj.qSigmaMeanLog = 0;
             end
             if strcmp(obj.opts.estimationARD,'max')
@@ -322,7 +294,7 @@ classdef varDistributionC < handle
                 obj.qPEntropy = obj.qPvonmisesEntropy;
             end
             
-            if strcmp(obj.opts.estimationNoise,'max2')
+            if strcmp(obj.opts.estimationNoise,'max')
                 obj.qSigmaEntropy = 0;
             end
             if strcmp(obj.opts.estimationARD,'max')
@@ -415,18 +387,10 @@ classdef varDistributionC < handle
         end
         
         function updateVariationalFactor(obj,variationalFactorName)
-            if ~ismember(variationalFactorName,{'qSigma','qAlpha'}) || ...
-                    obj.testIfHyperparameterLearningActive(variationalFactorName) ...
-                    || strcmp(obj.data.partitionName,'Test')
+            if ~ismember(variationalFactorName,{'qSigma'}) || obj.data.iter>=150 || strcmp(obj.data.partitionName,'Test')
                 obj.(strcat('update',variationalFactorName));
                 obj.updateStatistics({variationalFactorName})
             end
-        end
-        function bool=testIfHyperparameterLearningActive(obj,variationalFactorName)
-            bool=obj.data.iter>=obj.opts.noiseLearningDelay && ...
-                strcmpi(variationalFactorName,'qSigma') ...
-                || obj.data.iter>=obj.opts.scaleLearningDelay && ...
-                strcmpi(variationalFactorName,'qAlpha');
         end
         
         function updateStatistics(obj,variationalFactorNames)
@@ -437,16 +401,15 @@ classdef varDistributionC < handle
             obj.updateStatisticsSpecialCases(variationalFactorNames);
         end
         function updateStatisticsSpecialCases(obj,variationalFactorNames)
-            %TODO: fix this abomination
-            if ismember('qAlpha',variationalFactorNames)
-                if strcmp(obj.opts.estimationARD,'max')
-                    obj.qAlpha.mean = obj.data.K./sum(obj.eCsquared,1);
-                    obj.qAlpha.MeanLog = log(obj.qAlpha.mean);
-                end
+            if ismember('qAlpha',variationalFactorNames) && ...
+                    strcmp(obj.opts.estimationARD,'max')
+                
+                obj.qAlpha.mean = obj.data.K./sum(obj.eCsquared,1);
+                obj.qAlpha.MeanLog = log(obj.qAlpha.mean);
             end
             
             if ismember('qSigma',variationalFactorNames) && ...
-                    strcmp(obj.opts.estimationNoise,'max2')
+                    strcmp(obj.opts.estimationNoise,'max')
                 
                 obj.qSigma.mean = 1./(1/(obj.data.J*obj.data.I)*(sum(obj.eAiDFtPtPFDAi,1)+...
                     obj.XInnerProductPrSlab-...
@@ -695,7 +658,6 @@ classdef varDistributionC < handle
                 permute(obj.qP.mean,[2 1 3]));
         end
         function compute_eDeAtXk(obj)
-            
             obj.eDeAtXk = obj.util.matrixProductPrSlab(obj.util.matrixProductPrSlab(...
                 obj.eD,obj.eA'),...
                 obj.data.X);
@@ -764,11 +726,7 @@ classdef varDistributionC < handle
             if strcmp(method,'hard')
                 nActive = sum(sum(obj.qC.mean,1)~=0);
             elseif strcmp(method,'threshold')
-                if ~strcmp(obj.opts.estimationARD,'maxNoARD')
-                    nActive = find(cumsum(sort(1./obj.qAlpha.mean,'descend')/sum(1./obj.qAlpha.mean))>0.95,1);
-                else
-                    nActive=-1; % not available
-                end
+                nActive = find(cumsum(sort(1./obj.qAlpha.mean,'descend')/sum(1./obj.qAlpha.mean))>0.95,1);
             end
             nActive = gather(nActive);
         end
