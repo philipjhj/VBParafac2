@@ -38,6 +38,7 @@ classdef varDistributionC < handle
         
         % Shared terms between moments
         
+        eAlphaDiag
         eFtPt
         eDeAtXk
         eDeAtXkeFtPtTrace
@@ -92,10 +93,41 @@ classdef varDistributionC < handle
             obj.qF = multiNormalDist('qF',[obj.data.M obj.data.M],false,obj.util);
             obj.qP = multiNormalDist('qP',[obj.data.J obj.data.M obj.data.K],true,obj.util);
             obj.qSigma = GammaDist('qSigma',[1 obj.data.K]);
-            obj.qAlpha = GammaDist('qAlpha',[1 obj.data.M]);
+            if strcmp(obj.opts.estimationARD,'maxNoARD')
+                obj.qAlpha = GammaDist('qAlpha',[1 1]);
+            else
+                obj.qAlpha = GammaDist('qAlpha',[1 obj.data.M]);
+            end
+            
+            if strcmp(obj.opts.estimationNoise(4:end),'Shared')
+                obj.qSigma = GammaDist('qSigma',[1 1]);
+            else
+                obj.qSigma = GammaDist('qSigma',[1 obj.data.K]);
+            end
             
             obj.pSigma = GammaDist('pSigma',[1 1]);
             obj.pAlpha = GammaDist('pAlpha',[1 1]);
+            
+            
+            
+            if strcmpi(obj.opts.initMethod,'mle')
+
+                % Start in MLE Parafac2 solution
+                if strcmp(obj.data.partitionName,'Test')
+                    X = {obj.data.X};
+                else
+                    X = obj.data.X;
+                end
+                [A,F,C,P,modelFit]=parafac2(X,obj.data.M,[0 0],[0 0 0 0 1]);
+                noise=0;
+                obj.qA.mean = A+noise*randn(size(A));
+                obj.qF.mean = F+noise*randn(size(F));
+                obj.qC.mean = C+noise*randn(size(C));
+                P=cat(3,P{:});
+                obj.qP.mean = bsxfun(@plus,P,noise*randn(size(P,1),size(P,2)));
+                
+                rng('default')
+            end
             
             if strcmpi(obj.opts.matrixProductPrSlab,'gpu')
                 obj.qA.mean = gpuArray(obj.qA.mean);
@@ -129,6 +161,7 @@ classdef varDistributionC < handle
         
         % TODO: Refactor SufficientStatistics into seperate class?
         function updateSufficientStatistics(obj)
+            obj.compute_eAlphaDiag;
             obj.compute_eA;
             obj.compute_eAtA;
             obj.compute_eD;
@@ -211,6 +244,8 @@ classdef varDistributionC < handle
                 obj.compute_eAiDFtPtPFDAi;
                 obj.compute_eDeAtXk;
                 obj.compute_eDeAtXkeFtPtTrace;
+            elseif strcmp(VariationalFactorName,'qAlpha')
+                obj.compute_eAlphaDiag;
             end
         end
         
@@ -219,6 +254,7 @@ classdef varDistributionC < handle
         
         function value = get.ELBO(obj)
             value = gather(obj.ePxz+obj.eQz);
+            %  fprintf('%f \n',[obj.ePxz,obj.eQz]);
         end
         
         function value = get.ePxz(obj)
@@ -229,9 +265,17 @@ classdef varDistributionC < handle
                     obj.qFMeanLog+obj.qPMeanLog+obj.qSigmaMeanLog+...
                     obj.qAlphaMeanLog;
             elseif strcmp(obj.data.partitionName,'Test')
-                value = obj.qXMeanLog+obj.qCMeanLog+...
-                    obj.qPMeanLog+obj.qSigmaMeanLog;
+                if isempty(strfind(obj.opts.estimationNoise,'Shared'))
+                    value = obj.qXMeanLog+obj.qCMeanLog+...
+                        obj.qPMeanLog+obj.qSigmaMeanLog;
+                else
+                    value = obj.qXMeanLog+obj.qCMeanLog+obj.qPMeanLog;
+                end
             end
+            %             fprintf('%f \n',[obj.qXMeanLog,obj.qAMeanLog,obj.qCMeanLog,...
+            %                     obj.qFMeanLog,obj.qPMeanLog,obj.qSigmaMeanLog,...
+            %                     obj.qAlphaMeanLog])
+            %               fprintf('----\n')
         end
         function value = get.eQz(obj)
             obj.computeEntropyValues(obj.opts.activeParams)
@@ -240,9 +284,15 @@ classdef varDistributionC < handle
                 value = obj.qAEntropy+obj.qCEntropy+obj.qFEntropy+...
                     obj.qPEntropy+obj.qSigmaEntropy+obj.qAlphaEntropy;
             elseif strcmp(obj.data.partitionName,'Test')
-                value = obj.qCEntropy+...
-                    obj.qPEntropy+obj.qSigmaEntropy;
+                if isempty(strfind(obj.opts.estimationNoise,'Shared'))
+                    value = obj.qCEntropy+...
+                        obj.qPEntropy+obj.qSigmaEntropy;
+                else
+                    value = obj.qCEntropy+obj.qPEntropy;
+                end
             end
+            %fprintf('%f \n%',[obj.qAEntropy,obj.qCEntropy,obj.qFEntropy,...
+            %        obj.qPEntropy,obj.qSigmaEntropy,obj.qAlphaEntropy])
         end
         
         function computeMeanLogValues(obj,variationalFactorNames)
@@ -265,8 +315,8 @@ classdef varDistributionC < handle
                 obj.computeqCMeanLog;
             end
             
-            % No expected value if hyperparameter are maximized
-            if strcmp(obj.opts.estimationNoise,'max')
+            % No expected value if parameter are maximized
+            if strcmp(obj.opts.estimationNoise,'max2')
                 obj.qSigmaMeanLog = 0;
             end
             if strcmp(obj.opts.estimationARD,'max')
@@ -290,7 +340,7 @@ classdef varDistributionC < handle
                 obj.qPEntropy = obj.qPvonmisesEntropy;
             end
             
-            if strcmp(obj.opts.estimationNoise,'max')
+            if strcmp(obj.opts.estimationNoise,'max2')
                 obj.qSigmaEntropy = 0;
             end
             if strcmp(obj.opts.estimationARD,'max')
@@ -310,23 +360,36 @@ classdef varDistributionC < handle
             tempSum = sum(sum(sum(obj.util.hadamardProductPrSlab(temp,...
                 obj.util.transformToTensor(obj.qSigma.mean)),3).*obj.eA));
             
-            obj.qXMeanLog = -obj.data.I*obj.data.J*obj.data.K/2*log(2*pi)+...
-                obj.data.J*obj.data.I/2*sum(obj.qSigma.MeanLog)-...
-                1/2*sum(obj.qSigma.mean.*(...
-                sum(obj.eAiDFtPtPFDAi)+obj.XInnerProductPrSlab))+tempSum;
+            if strcmp(obj.opts.estimationNoise(4:end),'Shared')
+                obj.qXMeanLog = -obj.data.I*obj.data.K*obj.data.J/2*log(2*pi)+...
+                    obj.data.I*obj.data.J*obj.data.K/2*obj.qSigma.MeanLog-...
+                    1/2*sum(obj.qSigma.mean.*(...
+                    sum(obj.eAiDFtPtPFDAi)+obj.XInnerProductPrSlab))+tempSum;
+            else
+                obj.qXMeanLog = -obj.data.I*obj.data.J*obj.data.K/2*log(2*pi)+...
+                    obj.data.I*obj.data.J/2*sum(obj.qSigma.MeanLog)-...
+                    1/2*sum(obj.qSigma.mean.*(...
+                    sum(obj.eAiDFtPtPFDAi)+obj.XInnerProductPrSlab))+tempSum;
+            end
         end
         function computeqAMeanLog(obj)
             obj.qAMeanLog = -obj.qA.I*obj.qA.J*log(2*pi)/2-1/2*obj.qA.meanInnerProductSumComponent;
         end
         function computeqCMeanLog(obj)
-            if isempty(obj.qAlpha.entropy) && strcmp(obj.opts.estimationARD,'avg')
-                obj.qAlpha.updateStatistics;
+            if isempty(obj.eAlphaDiag)
+                obj.compute_eAlphaDiag
             end
-            obj.qCMeanLog = -obj.qC.I*obj.qC.J*log(2*pi)/2+...
-                obj.data.K/2*sum(obj.qAlpha.MeanLog)-1/2*(...
-                trace(diag(obj.qAlpha.mean)*sum(obj.qC.variance,3))+...
-                sum(sum(obj.qC.mean.^2*diag(obj.qAlpha.mean))));
-            
+            if strcmpi(obj.opts.estimationARD,'maxNoARD')
+                obj.qCMeanLog = -obj.data.K*obj.data.M*log(2*pi)/2+...
+                    obj.data.K*obj.data.M/2*sum(obj.qAlpha.MeanLog)-1/2*(...
+                    sum(sum(obj.eAlphaDiag.*sum(obj.qC.variance,3)))+...
+                    sum(sum(obj.qC.mean.^2,1).*obj.qAlpha.mean));
+            else
+                obj.qCMeanLog = -obj.data.K*obj.data.M*log(2*pi)/2+...
+                    obj.data.K/2*sum(obj.qAlpha.MeanLog)-1/2*(...
+                    sum(sum(obj.eAlphaDiag.*sum(obj.qC.variance,3)))+...
+                    sum(sum(obj.qC.mean.^2,1).*obj.qAlpha.mean));
+            end
         end
         function computeqFMeanLog(obj)
             obj.qFMeanLog = -obj.qF.I*obj.qF.J*log(2*pi)/2-1/2*obj.qF.meanInnerProductSumComponent;
@@ -335,16 +398,30 @@ classdef varDistributionC < handle
             obj.qPMeanLog = -obj.qP.I*obj.qP.J*obj.qP.K*log(2*pi)/2-1/2*obj.qP.meanInnerProductSumComponent;
         end
         function computeqSigmaMeanLog(obj)
-            obj.qSigmaMeanLog = obj.data.K*...
-                log(1/(gamma(obj.pSigma.alpha)*obj.pSigma.beta^obj.pSigma.alpha))+...
-                sum((obj.pSigma.alpha-1).*...
-                obj.qSigma.MeanLog-obj.qSigma.mean.*1/obj.pSigma.beta);
+            if strcmpi(obj.opts.estimationNoise(4:end),'Shared')
+                obj.qSigmaMeanLog = obj.data.K*...
+                    log(1/(gamma(obj.pSigma.alpha)*obj.pSigma.beta^obj.pSigma.alpha))+...
+                    obj.data.K*sum((obj.pSigma.alpha-1).*...
+                    obj.qSigma.MeanLog-obj.qSigma.mean.*1/obj.pSigma.beta);
+            else
+                obj.qSigmaMeanLog = obj.data.K*...
+                    log(1/(gamma(obj.pSigma.alpha)*obj.pSigma.beta^obj.pSigma.alpha))+...
+                    sum((obj.pSigma.alpha-1).*...
+                    obj.qSigma.MeanLog-obj.qSigma.mean.*1/obj.pSigma.beta);
+            end
         end
         function computeqAlphaMeanLog(obj)
-            obj.qAlphaMeanLog = obj.data.M*...
-                log(1/(gamma(obj.pAlpha.alpha)*obj.pAlpha.beta^obj.pAlpha.alpha))+...
-                sum((obj.pAlpha.alpha-1)*...
-                obj.qAlpha.MeanLog-obj.qAlpha.mean.*1/obj.pAlpha.beta);
+            if strcmpi(obj.opts.estimationARD,'maxNoARD')
+                obj.qAlphaMeanLog = obj.data.M*...
+                    log(1/(gamma(obj.pAlpha.alpha)*obj.pAlpha.beta^obj.pAlpha.alpha))+...
+                    obj.data.M*sum((obj.pAlpha.alpha-1)*...
+                    obj.qAlpha.MeanLog-obj.qAlpha.mean.*1/obj.pAlpha.beta);
+            else
+                obj.qAlphaMeanLog = obj.data.M*...
+                    log(1/(gamma(obj.pAlpha.alpha)*obj.pAlpha.beta^obj.pAlpha.alpha))+...
+                    sum((obj.pAlpha.alpha-1)*...
+                    obj.qAlpha.MeanLog-obj.qAlpha.mean.*1/obj.pAlpha.beta);
+            end
         end
         
         % #################################################################
@@ -383,10 +460,18 @@ classdef varDistributionC < handle
         end
         
         function updateVariationalFactor(obj,variationalFactorName)
-            if ~ismember(variationalFactorName,{'qSigma'}) || obj.data.iter>=150 || strcmp(obj.data.partitionName,'Test')
+            if ~ismember(variationalFactorName,{'qSigma','qAlpha'}) || ...
+                    obj.testIfHyperparameterLearningActive(variationalFactorName) ...
+                    || strcmp(obj.data.partitionName,'Test')
                 obj.(strcat('update',variationalFactorName));
                 obj.updateStatistics({variationalFactorName})
             end
+        end
+        function bool=testIfHyperparameterLearningActive(obj,variationalFactorName)
+            bool=obj.data.iter>=obj.opts.noiseLearningDelay && ...
+                strcmpi(variationalFactorName,'qSigma') ...
+                || obj.data.iter>=obj.opts.scaleLearningDelay && ...
+                strcmpi(variationalFactorName,'qAlpha');
         end
         
         function updateStatistics(obj,variationalFactorNames)
@@ -397,15 +482,16 @@ classdef varDistributionC < handle
             obj.updateStatisticsSpecialCases(variationalFactorNames);
         end
         function updateStatisticsSpecialCases(obj,variationalFactorNames)
-            if ismember('qAlpha',variationalFactorNames) && ...
-                    strcmp(obj.opts.estimationARD,'max')
-                
-                obj.qAlpha.mean = obj.data.K./sum(obj.eCsquared,1);
-                obj.qAlpha.MeanLog = log(obj.qAlpha.mean);
+            %TODO: fix this abomination
+            if ismember('qAlpha',variationalFactorNames)
+                if strcmp(obj.opts.estimationARD,'max')
+                    obj.qAlpha.mean = obj.data.K./sum(obj.eCsquared,1);
+                    obj.qAlpha.MeanLog = log(obj.qAlpha.mean);
+                end
             end
             
             if ismember('qSigma',variationalFactorNames) && ...
-                    strcmp(obj.opts.estimationNoise,'max')
+                    strcmp(obj.opts.estimationNoise,'max2')
                 
                 obj.qSigma.mean = 1./(1/(obj.data.J*obj.data.I)*(sum(obj.eAiDFtPtPFDAi,1)+...
                     obj.XInnerProductPrSlab-...
@@ -452,7 +538,7 @@ classdef varDistributionC < handle
                 obj.util.transformToTensor(obj.qSigma.mean),...
                 obj.util.hadamardProductPrSlab(obj.eAtA,...
                 obj.eFtPtPF))...
-                ,diag(obj.qAlpha.mean)));
+                ,obj.eAlphaDiag));
             
             obj.qC.mean=squeeze(obj.util.matrixProductPrSlab(...
                 obj.util.hadamardProductPrSlab(...
@@ -463,7 +549,7 @@ classdef varDistributionC < handle
                 obj.eA))),1)),...
                 obj.qC.variance))';
             
-            if size(obj.qC.mean,2) == 1
+            if size(obj.qC.mean,1) == 1
                 obj.qC.mean = obj.qC.mean';
             end
         end
@@ -473,7 +559,11 @@ classdef varDistributionC < handle
             n = obj.data.K;
             
             % the bsxfun as index for ePtP gets the diagonals
-            ePtPdiag = reshape(obj.ePtP(bsxfun(@plus,[1:p+1:p*p]',[0:n-1]*p*p))',1,1,n,p);
+            if obj.data.M>1
+                ePtPdiag = reshape(obj.ePtP(bsxfun(@plus,[1:p+1:p*p]',[0:n-1]*p*p))',1,1,n,p);
+            else
+                ePtPdiag = obj.ePtP;
+            end
             
             varInv = bsxfun(@plus,squeeze(sum(...
                 obj.util.hadamardProductPrSlab(...
@@ -499,11 +589,16 @@ classdef varDistributionC < handle
                 
                 c = squeeze(sum(b,2));
                 
-                t1=sum(obj.util.hadamardProductPrSlab(...
-                    obj.util.transformToTensor(obj.qSigma.mean),...
-                    obj.util.matrixProductPrSlab(...
-                    obj.eDAtAD,...
-                    c(:,m,:))),3)';
+                if obj.data.M>1
+                    t1=sum(obj.util.hadamardProductPrSlab(...
+                        obj.util.transformToTensor(obj.qSigma.mean),...
+                        obj.util.matrixProductPrSlab(...
+                        obj.eDAtAD,...
+                        c(:,m,:))),3)';
+                else
+                    t1=0;
+                end
+                
                 
                 obj.qF.mean(m,:) = (t2(m,:)-t1)*obj.qF.variance(:,:,m);
             end
@@ -511,12 +606,21 @@ classdef varDistributionC < handle
         function updateqP(obj)
             if ~strcmp(obj.opts.estimationP,'vonmises')
                 %
-                obj.qP.variance = permute( obj.util.matrixInversePrSlab(bsxfun(@plus,obj.util.hadamardProductPrSlab(...
-                    obj.util.transformToTensor(obj.qSigma.mean),...
-                    (obj.qF.computeMeanInnerProductScaledSlabs(...
-                    permute(obj.eDAtAD,[1 2 4 3])...
-                    )))...
-                    ,eye(obj.data.M))),[1 2 4 3]);
+                if obj.data.M>1
+                    obj.qP.variance = permute(obj.util.matrixInversePrSlab(bsxfun(@plus,obj.util.hadamardProductPrSlab(...
+                        obj.util.transformToTensor(obj.qSigma.mean),...
+                        (obj.qF.computeMeanInnerProductScaledSlabs(...
+                        permute(obj.eDAtAD,[1 2 4 3])...
+                        )))...
+                        ,eye(obj.data.M))),[1 2 4 3]);
+                else
+                    obj.qP.variance = permute(obj.util.matrixInversePrSlab(bsxfun(@plus,obj.util.hadamardProductPrSlab(...
+                        obj.util.transformToTensor(obj.qSigma.mean),...
+                        obj.qF.computeMeanInnerProductScaledSlabs(...
+                        obj.eDAtAD...
+                        ))...
+                        ,eye(obj.data.M))),[1 2 4 3]);
+                end
             end
             obj.computeqPmean;
         end
@@ -635,8 +739,19 @@ classdef varDistributionC < handle
         % # Shared Terms
         
         % ## First order
+        function compute_eAlphaDiag(obj)
+            if ismatrix(obj.qAlpha.mean)
+                obj.eAlphaDiag = diag(obj.qAlpha.mean);
+            else
+                obj.eAlphaDiag = eye(obj.data.M)*obj.qAlpha.mean;
+            end
+        end
         function compute_eD(obj)
-            obj.eD = obj.util.matrixDiagonalPrSlab(obj.qC.mean');
+            if obj.data.K>1
+                obj.eD = obj.util.matrixDiagonalPrSlab(obj.qC.mean');
+            else
+                obj.eD = diag(obj.qC.mean);
+            end
         end
         function compute_eA(obj,r0)
             % Expectation of A w.r.t. mode r0
@@ -647,6 +762,7 @@ classdef varDistributionC < handle
                 permute(obj.qP.mean,[2 1 3]));
         end
         function compute_eDeAtXk(obj)
+            
             obj.eDeAtXk = obj.util.matrixProductPrSlab(obj.util.matrixProductPrSlab(...
                 obj.eD,obj.eA'),...
                 obj.data.X);
@@ -673,22 +789,35 @@ classdef varDistributionC < handle
             if strcmp(obj.opts.estimationP,'vonmises')
                 obj.ePtP = repmat(eye(obj.data.M),1,1,obj.data.K);
             else
-                obj.ePtP = obj.data.J*squeeze(obj.qP.variance)+repmat(eye(obj.data.M),1,1,obj.data.K);%repmat(eye(obj.data.M),1,1,obj.data.K);
+                if obj.data.M>1
+                    qPVariance=squeeze(obj.qP.variance);
+                else
+                    qPVariance=permute(obj.qP.variance,[1 2 4 3]);
+                end
+                obj.ePtP = obj.data.J*qPVariance+repmat(eye(obj.data.M),1,1,obj.data.K);%repmat(eye(obj.data.M),1,1,obj.data.K);
             end
         end
         function compute_eFtPtPF(obj)
-            diagFvec=reshape(obj.qF.mean',1,obj.data.M,1,obj.data.M);
-            diagFvecT = permute(diagFvec,[2 1 4 3]);
-            fullF=(obj.util.matrixProductPrSlab(diagFvecT,diagFvec));
-            
-            ePtPtensor=reshape(obj.ePtP,1,1,obj.data.M,obj.data.M,obj.data.K);
-            ePtPdiag = reshape(sum(...
-                obj.util.hadamardProductPrSlab(eye(obj.data.M),obj.ePtP),2),...
-                1,1,obj.data.M,obj.data.K);
-            
-            value=squeeze(sum(sum(...
-                obj.util.hadamardProductPrSlab(fullF,ePtPtensor),3),4))+...
-                squeeze(sum(obj.util.hadamardProductPrSlab(obj.qF.variance,ePtPdiag),3));
+            if obj.data.M>1
+                diagFvec=reshape(obj.qF.mean',1,obj.data.M,1,obj.data.M);
+                diagFvecT = permute(diagFvec,[2 1 4 3]);
+                fullF=(obj.util.matrixProductPrSlab(diagFvecT,diagFvec));
+                
+                ePtPtensor=reshape(obj.ePtP,1,1,obj.data.M,obj.data.M,obj.data.K);
+                ePtPdiag = reshape(sum(...
+                    obj.util.hadamardProductPrSlab(eye(obj.data.M),obj.ePtP),2),...
+                    1,1,obj.data.M,obj.data.K);
+                v1=squeeze(sum(sum(...
+                    obj.util.hadamardProductPrSlab(fullF,ePtPtensor),3),4));
+                
+                v2=squeeze(sum(obj.util.hadamardProductPrSlab(obj.qF.variance,ePtPdiag),3));
+                
+                value=v1+v2;
+            else
+                value = obj.util.hadamardProductPrSlab(obj.qF.variance,obj.ePtP)+...
+                    obj.util.hadamardProductPrSlab(obj.qF.mean^2,obj.ePtP);
+                
+            end
             
             obj.eFtPtPF = value;
         end
@@ -715,7 +844,11 @@ classdef varDistributionC < handle
             if strcmp(method,'hard')
                 nActive = sum(sum(obj.qC.mean,1)~=0);
             elseif strcmp(method,'threshold')
-                nActive = find(cumsum(sort(1./obj.qAlpha.mean,'descend')/sum(1./obj.qAlpha.mean))>0.95,1);
+                if ~strcmp(obj.opts.estimationARD,'maxNoARD')
+                    nActive = find(cumsum(sort(1./obj.qAlpha.mean,'descend')/sum(1./obj.qAlpha.mean))>0.95,1);
+                else
+                    nActive=-1; % not available
+                end
             end
             nActive = gather(nActive);
         end
