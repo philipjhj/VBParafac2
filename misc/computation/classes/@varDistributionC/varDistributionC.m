@@ -542,8 +542,8 @@ classdef varDistributionC < handle
                 obj.eA))),1)),...
                 obj.qC.variance))';
             
-            if any(size(obj.qC.mean)==1)
-                obj.qC.mean = reshape(obj.qC.mean,obj.data.K,obj.data.M);
+            if size(obj.qC.mean,2) == 1
+                obj.qC.mean = obj.qC.mean';
             end
         end
         function updateqF(obj)
