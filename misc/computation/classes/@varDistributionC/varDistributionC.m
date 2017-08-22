@@ -378,6 +378,9 @@ classdef varDistributionC < handle
             obj.qAMeanLog = -obj.qA.I*obj.qA.J*log(2*pi)/2-1/2*obj.qA.meanInnerProductSumComponent;
         end
         function computeqCMeanLog(obj)
+            if isempty(obj.qAlpha.entropy) && strcmp(obj.opts.estimationARD,'avg')
+                obj.qAlpha.updateStatistics;
+            end
             obj.qCMeanLog = -obj.qC.I*obj.qC.J*log(2*pi)/2+...
                 obj.data.K/2*sum(obj.qAlpha.MeanLog)-1/2*(...
                 trace(diag(obj.qAlpha.mean)*sum(obj.qC.variance,3))+...
