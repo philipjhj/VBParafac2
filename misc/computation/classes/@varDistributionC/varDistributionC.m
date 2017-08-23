@@ -38,7 +38,6 @@ classdef varDistributionC < handle
         
         % Shared terms between moments
         
-        eAlphaDiag
         eFtPt
         eDeAtXk
         eDeAtXkeFtPtTrace
@@ -163,7 +162,6 @@ classdef varDistributionC < handle
         
         % TODO: Refactor SufficientStatistics into seperate class?
         function updateSufficientStatistics(obj)
-            obj.compute_eAlphaDiag;
             obj.compute_eA;
             obj.compute_eAtA;
             obj.compute_eD;
@@ -246,8 +244,6 @@ classdef varDistributionC < handle
                 obj.compute_eAiDFtPtPFDAi;
                 obj.compute_eDeAtXk;
                 obj.compute_eDeAtXkeFtPtTrace;
-            elseif strcmp(VariationalFactorName,'qAlpha')
-                obj.compute_eAlphaDiag;
             end
         end
         
@@ -378,14 +374,17 @@ classdef varDistributionC < handle
             obj.qAMeanLog = -obj.qA.I*obj.qA.J*log(2*pi)/2-1/2*obj.qA.meanInnerProductSumComponent;
         end
         function computeqCMeanLog(obj)
-            if isempty(obj.qAlpha.entropy) && strcmp(obj.opts.estimationARD,'avg')
-                obj.qAlpha.updateStatistics;
+            if strcmpi(obj.opts.estimationARD,'maxNoARD')
+                obj.qCMeanLog = -obj.data.K*obj.data.M*log(2*pi)/2+...
+                    obj.data.K*obj.data.M/2*sum(obj.qAlpha.MeanLog)-1/2*(...
+                    sum(obj.qAlpha.mean.*diag(sum(obj.qC.variance,3)))+...
+                    sum(sum(obj.qC.mean.^2,1).*obj.qAlpha.mean));
+            else
+                obj.qCMeanLog = -obj.data.K*obj.data.M*log(2*pi)/2+...
+                    obj.data.K/2*sum(obj.qAlpha.MeanLog)-1/2*(...
+                    sum(obj.qAlpha.mean(:).*diag(sum(obj.qC.variance,3)))+...
+                    sum(sum(obj.qC.mean.^2,1).*obj.qAlpha.mean));
             end
-            obj.qCMeanLog = -obj.qC.I*obj.qC.J*log(2*pi)/2+...
-                obj.data.K/2*sum(obj.qAlpha.MeanLog)-1/2*(...
-                trace(diag(obj.qAlpha.mean)*sum(obj.qC.variance,3))+...
-                sum(sum(obj.qC.mean.^2*diag(obj.qAlpha.mean))));
-            
         end
         function computeqFMeanLog(obj)
             obj.qFMeanLog = -obj.qF.I*obj.qF.J*log(2*pi)/2-1/2*obj.qF.meanInnerProductSumComponent;
@@ -545,8 +544,8 @@ classdef varDistributionC < handle
                 obj.eA))),1)),...
                 obj.qC.variance))';
             
-            if size(obj.qC.mean,2) == 1
-                obj.qC.mean = obj.qC.mean';
+            if any(size(obj.qC.mean)==1)
+                obj.qC.mean = reshape(obj.qC.mean,obj.data.K,obj.data.M);
             end
         end
         function updateqF(obj)
@@ -735,13 +734,6 @@ classdef varDistributionC < handle
         % # Shared Terms
         
         % ## First order
-        function compute_eAlphaDiag(obj)
-            if isscalar(obj.qAlpha.mean)
-                obj.eAlphaDiag = obj.qAlpha.mean;
-            else
-                obj.eAlphaDiag = diag(obj.qAlpha.mean);
-            end
-        end
         function compute_eD(obj)
             if obj.data.K>1
                 obj.eD = obj.util.matrixDiagonalPrSlab(obj.qC.mean');
