@@ -317,7 +317,7 @@ classdef varDistributionC < handle
             if strcmp(obj.opts.estimationNoise,'max2')
                 obj.qSigmaMeanLog = 0;
             end
-            if strcmp(obj.opts.estimationARD,'max')
+            if strcmp(obj.opts.estimationARD(1:3),'max')
                 obj.qAlphaMeanLog = 0;
             end
             if strcmp(obj.opts.estimationP,'vonmises')
@@ -341,7 +341,7 @@ classdef varDistributionC < handle
             if strcmp(obj.opts.estimationNoise,'max2')
                 obj.qSigmaEntropy = 0;
             end
-            if strcmp(obj.opts.estimationARD,'max')
+            if strcmp(obj.opts.estimationARD(1:3),'max')
                 obj.qAlphaEntropy = 0;
             end
         end
@@ -377,13 +377,13 @@ classdef varDistributionC < handle
             if strcmpi(obj.opts.estimationARD,'maxNoARD')
                 obj.qCMeanLog = -obj.data.K*obj.data.M*log(2*pi)/2+...
                     obj.data.K*obj.data.M/2*sum(obj.qAlpha.MeanLog)-1/2*(...
-                    sum(obj.qAlpha.mean.*diag(sum(obj.qC.variance,3)))+...
-                    sum(sum(obj.qC.mean.^2,1).*obj.qAlpha.mean));
+                    obj.qAlpha.mean*trace(sum(obj.qC.variance,3))+...
+                    sum(sum(obj.qC.mean.^2))*obj.qAlpha.mean);
             else
                 obj.qCMeanLog = -obj.data.K*obj.data.M*log(2*pi)/2+...
                     obj.data.K/2*sum(obj.qAlpha.MeanLog)-1/2*(...
-                    sum(obj.qAlpha.mean(:).*diag(sum(obj.qC.variance,3)))+...
-                    sum(sum(obj.qC.mean.^2,1).*obj.qAlpha.mean));
+                    trace(diag(obj.qAlpha.mean)*sum(obj.qC.variance,3))+...
+                    sum(sum(obj.qC.mean.^2*diag(obj.qAlpha.mean))));
             end
         end
         function computeqFMeanLog(obj)
@@ -481,6 +481,9 @@ classdef varDistributionC < handle
             if ismember('qAlpha',variationalFactorNames)
                 if strcmp(obj.opts.estimationARD,'max')
                     obj.qAlpha.mean = obj.data.K./sum(obj.eCsquared,1);
+                    obj.qAlpha.MeanLog = log(obj.qAlpha.mean);
+                elseif strcmp(obj.opts.estimationARD,'maxNoARD')
+                    obj.qAlpha.mean = obj.data.K*obj.data.M/sum(sum(obj.eCsquared));
                     obj.qAlpha.MeanLog = log(obj.qAlpha.mean);
                 end
             end
@@ -701,10 +704,10 @@ classdef varDistributionC < handle
                     obj.eDeAtXkeFtPtTrace));
             elseif strcmp(obj.opts.estimationNoise,'max')
                 [obj.qSigma.alpha,obj.qSigma.beta] = hp_update_gamma(...
-                    obj.qSigma.alpha,obj.qSigma.beta,obj.qSigma.mean,obj.qSigma.MeanLog);
+                    obj.qSigma.alpha,obj.qSigma.beta,obj.qSigma.mean);
             elseif strcmp(obj.opts.estimationNoise,'maxShared')
                 [obj.qSigma.alpha,obj.qSigma.beta] = hp_update_gamma(...
-                    obj.qSigma.alpha,obj.qSigma.beta,obj.qSigma.mean,obj.qSigma.MeanLog);
+                    obj.qSigma.alpha,obj.qSigma.beta,obj.qSigma.mean);
             elseif strcmp(obj.opts.estimationNoise,'max2')
                 obj.qSigma.mean = 1./(1/(obj.data.J*obj.data.I)*...
                     (sum(obj.eAiDFtPtPFDAi,1)+...
@@ -722,8 +725,10 @@ classdef varDistributionC < handle
                 obj.qAlpha.mean = obj.data.K./sum(obj.eCsquared,1);
                 obj.qAlpha.MeanLog = log(obj.qAlpha.mean);
             elseif strcmp(obj.opts.estimationARD,'maxNoARD')
-                [obj.qAlpha.alpha,obj.qAlpha.beta] = hp_update_gamma(...
-                    obj.qAlpha.alpha,obj.qAlpha.beta,obj.qAlpha.mean,obj.qAlpha.MeanLog);
+                obj.qAlpha.mean = obj.data.K*obj.data.M/sum(sum(obj.eCsquared));
+                obj.qAlpha.MeanLog = log(obj.qAlpha.mean);
+                %[obj.qAlpha.alpha,obj.qAlpha.beta] = hp_update_gamma(...
+                %    obj.qAlpha.alpha,obj.qAlpha.beta,obj.qAlpha.mean);
             elseif strcmp(obj.opts.estimationARD,'avgNoARD')
                 obj.qAlpha.alpha = obj.pAlpha.alpha+1/2*obj.data.K*obj.data.M;
                 obj.qAlpha.beta = 1./(1/obj.pAlpha.beta+1/2*sum(sum(obj.eCsquared)));
