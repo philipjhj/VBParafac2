@@ -1,5 +1,6 @@
-function [a,b] = hp_update_gamma(a,b,alpha,ln_alpha)
+function [a,b] = hp_update_gamma(a,b,alpha)
     b=1./b;
+    ln_alpha = psi(a)-log(b);
     aold = a-1;
     while any((a-aold)/abs(a) > 1e-9)
         aold = a;

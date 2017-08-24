@@ -75,11 +75,11 @@ myModel.opts.verbose = 1;
 myModel.opts.debugFlag = 0;
 myModel.opts.estimationP= 'parafac2svd';
 % myModel.opts.estimationP = 'vonmises';
-myModel.opts.estimationARD = 'max';
+myModel.opts.estimationARD = 'maxNoARD';
 myModel.opts.estimationNoise = 'maxShared';
 myModel.opts.initMethod = 'mle';
 myModel.opts.noiseLearningDelay=20;
-myModel.opts.scaleLearningDelay=10;
+myModel.opts.scaleLearningDelay=0;
 
 myModel.opts.matrixProductPrSlab = 'mtimesx';
 myModel.opts.nActiveComponents = 'threshold';
@@ -99,7 +99,7 @@ myModel.fitTrainingData;
 
 % myModel.opts.activeParams = {'qA','qC','qP','qSigma','qF'};
 %%
-Ms = 1:5
+Ms = 5:6
 rng('default')
 myModel.crossValidateM(Ms)
 %%

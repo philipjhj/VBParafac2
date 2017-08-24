@@ -141,8 +141,12 @@ classdef dataClass < handle
         end
         
         function values = relativeDiffErrorIters(obj)
-            relDiff=(diff(obj.ELBOall)./abs(obj.ELBOall(2:end)));
-            values=relDiff(relDiff<-1e-12);
+            if ~isempty(obj.ELBOall)
+                relDiff=(diff(obj.ELBOall)./abs(obj.ELBOall(2:end)));
+                values=relDiff(relDiff<-1e-12);
+            else
+                values = [];
+            end
         end
     end
     
