@@ -86,6 +86,11 @@ classdef varDistributionC < handle
         end
         
         function initializeVariationalFactors(obj)
+            
+            % When testing
+            % qC.mean random init, qP update
+            %
+            
             obj.qA = multiNormalDist('qA',[obj.data.I obj.data.M],true,obj.util);
             
             obj.qC = multiNormalDist('qC',[obj.data.K obj.data.M],false,obj.util);
@@ -109,7 +114,7 @@ classdef varDistributionC < handle
             
             
             
-            if strcmpi(obj.opts.initMethod,'mle')
+            if strcmpi(obj.opts.initMethod,'mle') && ~strcmp(obj.data.partitionName,'Test')
 
                 % Start in MLE Parafac2 solution
                 if strcmp(obj.data.partitionName,'Test')
@@ -406,17 +411,10 @@ classdef varDistributionC < handle
             end
         end
         function computeqAlphaMeanLog(obj)
-            if strcmpi(obj.opts.estimationARD,'maxNoARD')
-                obj.qAlphaMeanLog = obj.data.M*...
-                    log(1/(gamma(obj.pAlpha.alpha)*obj.pAlpha.beta^obj.pAlpha.alpha))+...
-                    obj.data.M*sum((obj.pAlpha.alpha-1)*...
-                    obj.qAlpha.MeanLog-obj.qAlpha.mean.*1/obj.pAlpha.beta);
-            else
                 obj.qAlphaMeanLog = obj.data.M*...
                     log(1/(gamma(obj.pAlpha.alpha)*obj.pAlpha.beta^obj.pAlpha.alpha))+...
                     sum((obj.pAlpha.alpha-1)*...
                     obj.qAlpha.MeanLog-obj.qAlpha.mean.*1/obj.pAlpha.beta);
-            end
         end
         
         % #################################################################
@@ -531,12 +529,18 @@ classdef varDistributionC < handle
             obj.qA.mean = (obj.qA.variance*sum_k)';
         end
         function updateqC(obj)
+            if strcmpi(obj.opts.estimationARD,'maxNoARD')
+                qAlphaDiag=eye(obj.data.M)*obj.qAlpha.mean;
+            else
+                qAlphaDiag=diag(obj.qAlpha.mean);
+            end
+            
             obj.qC.variance=obj.util.matrixInversePrSlab(...
                 bsxfun(@plus,obj.util.hadamardProductPrSlab(...
                 obj.util.transformToTensor(obj.qSigma.mean),...
                 obj.util.hadamardProductPrSlab(obj.eAtA,...
                 obj.eFtPtPF))...
-                ,diag(obj.qAlpha.mean)));
+                ,qAlphaDiag));
             
             obj.qC.mean=squeeze(obj.util.matrixProductPrSlab(...
                 obj.util.hadamardProductPrSlab(...

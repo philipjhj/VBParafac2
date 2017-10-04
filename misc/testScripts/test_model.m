@@ -1,7 +1,11 @@
 %load('/media/data/DataAndResults/Thesis/motor_normalized_all_subs.mat')
 % set_wd(2)
 % set(0,'DefaultFigureWindowStyle','docked')
-load('/media/data/DataAndResults/Thesis/data/dataBro/Models and data/Apple data/Int2.mat')
+int_No=19;
+load(['/run/user/1001/gvfs/sftp:host=transfer.gbar.dtu.dk,user=phav/work1/phav/VBParafac2paper/data/dataBro/Models and data/Apple data/Int',num2str(int_No),'.mat'])
+myInt=I19;
+figure; for k=1:36; plot(squeeze(myInt(:,:,k))); hold on; end; axis tight
+title(['Int ',num2str(int_No)])
 %%
 
 warning on MATLAB:nearlySingularMatrix
@@ -15,10 +19,10 @@ Mesti=3;
 %%
 % myModel=varBayesModelParafac2;
 
-I=20;
+I=50;
 J=I;
-K=4;
-M=2;
+K=10;
+M=4;
 Mesti = M;
 
 options.dimensions = [I J K M];
@@ -27,12 +31,13 @@ options.initMethod = 'kiers';
 options.congruence = 0.4;
 % 1e4 1e-3 i ARD tests
 options.precision = [1e2 1e-6];
-options.SNR = -4;
-options.noiseType = 'homo';
+options.SNR = 2;
+options.noiseType = 'heteroscedastic';
 % [1e4 1e-8] creates problems for qC
 
 % sumSNR = 0;
 % for k = 1:100
+rng('default')
 rng('shuffle')
 % rng(1)
 data = varBayesModelParafac2.generateDataFromModel(options);
@@ -41,17 +46,23 @@ data = varBayesModelParafac2.generateDataFromModel(options);
 % sumSNR = sumSNR+10*log10(norm(data.Xtrue(:),'fro')^2/norm(data.Etrue(:),'fro')^2);
 % end
 % sumSNR/100
-% I2 = I2/(norm(I2(:),'fro')/numel(I2));
-% data.X = permute(I2,[2 1 3]);
+
+%%
+myInt=I21;
+myInt = myInt/(norm(myInt(:),'fro')/numel(myInt));
+data=dataClass;
+data.Xunfolded = permute(myInt,[2 1 3]);
+Mesti=4
 %
 % %
-% %
+%%
 % data=dataClass;
 % data.Xunfolded = permute(reshape(X,DimX),[2 3 1]);
 
-% normalModel = normalParafac2(data.X);
+normalModel = normalParafac2(data.X);
 % normalModel = normalParafac2(permute(I2,[2 1 3]));
-
+normalModel=normalModel.fitParafac2(4);
+[f1_DF,f2_DF]=normalModel.Parafac2Fit(data.Xtrue)
 %%
 % for m = 2:5
     rng('default')
@@ -62,8 +73,9 @@ data = varBayesModelParafac2.generateDataFromModel(options);
 %
 %
 % parafac2(data.Xtrue,Mesti,[0 0],[0 0 0 0 0]);
-% normalModel.Parafac2Fit(data.Xtrue)
+[f1,f2]=normalModel.Parafac2Fit(data.Xtrue)
 %
+%%
 % rng('default')
 myModel=varBayesModelParafac2(data,Mesti);
 %
@@ -75,18 +87,18 @@ myModel.opts.verbose = 1;
 myModel.opts.debugFlag = 0;
 myModel.opts.estimationP= 'parafac2svd';
 % myModel.opts.estimationP = 'vonmises';
-myModel.opts.estimationARD = 'maxNoARD';
-myModel.opts.estimationNoise = 'maxShared';
+myModel.opts.estimationARD = 'max';
+myModel.opts.estimationNoise = 'avg';
 myModel.opts.initMethod = 'mle';
-myModel.opts.noiseLearningDelay=20;
+myModel.opts.noiseLearningDelay=50;
 myModel.opts.scaleLearningDelay=0;
 
 myModel.opts.matrixProductPrSlab = 'mtimesx';
 myModel.opts.nActiveComponents = 'threshold';
-myModel.opts.showIter = 1;
+myModel.opts.showIter = 20;
 % myModel.opts.rngInput = 15; % bad ones: 8, good ones: 15, 16, 19, 21, CORRECT: 31
-myModel.opts.maxIter = 5000;
-% myModel.opts.maxTime = 4;
+myModel.opts.maxIter =1000;
+%myModel.opts.maxTime = 4;
 
 myModel.opts.activeParams = {'qC','qP','qA','qF','qAlpha','qSigma'};
 %%
@@ -96,6 +108,8 @@ myModel.partitionData(myModel.fullData.X)
 % tic
 myModel.fitTrainingData;
 % toc 
+%
+[f1,f2]=myModel.Parafac2Fit(myModel.qDistTrain,data.Xtrue)
 
 % myModel.opts.activeParams = {'qA','qC','qP','qSigma','qF'};
 %%

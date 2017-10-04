@@ -451,18 +451,29 @@ classdef varBayesModelParafac2 < handle
             
         end
         
-        function [fit,fit_true] = Parafac2Fit(obj,qDist)
-            
+        function [fit,fit_true] = Parafac2Fit(obj,qDist,Xtrue)
+            if nargin < 3
+               Xtrue = [];
+            end
             residual=bsxfun(@minus,qDist.data.X,obj.util.matrixProductPrSlab(...
                 qDist.qA.mean,obj.util.matrixProductPrSlab(qDist.eD,...
                 obj.util.matrixProductPrSlab(qDist.qF.mean',permute(...
                 qDist.qP.mean,[2 1 3])))));
             
+            if ~isempty(Xtrue)
+            residual_true=bsxfun(@minus,Xtrue,obj.util.matrixProductPrSlab(...
+                qDist.qA.mean,obj.util.matrixProductPrSlab(qDist.eD,...
+                obj.util.matrixProductPrSlab(qDist.qF.mean',permute(...
+                qDist.qP.mean,[2 1 3])))));
+                sum_res_true = norm(residual_true(:),'fro')^2;
+                sum_x_true = norm(Xtrue(:),'fro')^2;
+                fit_true=gather((1-sum_res_true/sum_x_true)*100);
+            end
+            
+            
             sum_res = norm(residual(:),'fro')^2;
             sum_x = norm(qDist.data.X(:),'fro')^2;
-            
-            fit=gather((1-sum_res/sum_x)*100);
-            fit_true=gather((1-sum_res/norm(qDist.data.Xtrue(:))^2)*100);
+            fit=gather((1-sum_res/sum_x)*100);   
             
         end
         
@@ -571,7 +582,7 @@ classdef varBayesModelParafac2 < handle
                 else
                     C = rand(K,M);
                 end
-                generatedData.Ctrue = 30*C;
+                generatedData.Ctrue = C;
                 generatedData.Ptrue = zeros(generatedData.J,generatedData.Mtrue,generatedData.K);
                 generatedData.Etrue = zeros(I,J,K);
                 
@@ -583,12 +594,13 @@ classdef varBayesModelParafac2 < handle
                 
                 ssq = generatedData.computeNoiseLevel(generatedData,dataSettings.SNR);
                 
-                if strcmp(dataSettings.noiseType,'hetero')
+                if strcmp(dataSettings.noiseType,'heteroscedastic')
                     pp=rand(1,generatedData.K);
-                elseif strcmp(dataSettings.noiseType,'homo')
+                elseif strcmp(dataSettings.noiseType,'homoscedastic')
                     pp=ones(1,generatedData.K);
                 end
                 
+                bar(pp/sum(pp))
                 pp=pp/sum(pp)*generatedData.K;
                 
                 generatedData.Sigmatrue = ssq;
@@ -598,9 +610,17 @@ classdef varBayesModelParafac2 < handle
                         ,eye(generatedData.J)*ssq*pp(k));
                 end
                 
-                %                 disp((norm(generatedData.Xtrue(:),'fro')^2/norm(generatedData.Etrue(:),'fro')^2))
-                
                 generatedData.Xunfolded = generatedData.Xtrue+generatedData.Etrue;
+                
+                snr=(norm(generatedData.Xtrue(:),'fro')^2/norm(generatedData.Etrue(:),'fro')^2);
+%                 disp('SNR')
+%                 disp(snr)
+%                 disp('SNR (dB)')
+%                 disp(10*log10(snr))
+%                 disp('Noise / Signal strength')
+%                 disp((norm(generatedData.Etrue(:),'fro')^2/norm(generatedData.Xtrue(:),'fro')^2)*100)
+%                 disp('Signal %')
+%                 disp((1-norm(generatedData.Etrue(:),'fro')^2/norm(generatedData.Xunfolded(:),'fro')^2)*100)
                 
             elseif strcmp(dataSettings.initMethod,'generative')
                 

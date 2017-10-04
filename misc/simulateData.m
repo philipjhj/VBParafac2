@@ -1,6 +1,6 @@
-I=150;
+I=50;
 J=I;
-K=20;
+K=10;
 M=4;
 
 options.dimensions = [I J K M];
@@ -9,18 +9,28 @@ options.initMethod = 'kiers';
 options.congruence = 0.4;
 % 1e4 1e-3 i ARD tests
 options.precision = [1e2 1e-6];
-options.SNR = 5;
-options.noiseType = 'homoscedastic';
+
 % [1e4 1e-8] creates problems for qC
 
-filepath=sprintf(['/media/data/DataAndResults/VBParafac2paper/data/' ...
-    'simulatedTest/simulatedSmallTestData_SNR_%s_noiseType_%s_'],...
-    num2str(options.SNR),options.noiseType);
 
-for rngSeed=1:4
-rng(rngSeed)
-data = varBayesModelParafac2.generateDataFromModel(options);
 
-save(strcat(filepath,num2str(rngSeed)),'data','options')
+noiseTypes={'homoscedastic','heteroscedastic'};
+for SNR = 2:2:10
+    for noiseTypeIDX = 1:2
+        for rngSeed=2:10
+            rng(rngSeed)
+            options.SNR = SNR;
+            options.noiseType = noiseTypes{noiseTypeIDX};
+
+            data = varBayesModelParafac2.generateDataFromModel(options);
+
+            filepath=sprintf(['/media/data/DataAndResults/VBParafac2paper/data/' ...
+                'simulatedTestSNR/simulatedData_SNR_%s_noiseType_%s_%d'],...
+                num2str(options.SNR),options.noiseType,rngSeed);
+            
+            save(filepath,'data','options')
+
+        end
+    end
 end
 

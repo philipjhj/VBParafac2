@@ -40,7 +40,7 @@ classdef normalParafac2 < handle
         function obj = fitParafac2(obj,M)
             
             obj.M = M;
-            [A,F,C,P,modelFit]=parafac2(obj.X,obj.M,[0 0],[0 0 0 0 1]);
+            [A,F,C,P,modelFit]=parafac2(obj.X,obj.M,[0 0],[1e-12 10000 0 0 1]);
             obj.A = A;
             obj.F = F;
             obj.C = C;
@@ -73,6 +73,20 @@ classdef normalParafac2 < handle
                 mtimesx(obj.F',permute(...
                 obj.P,[2 1 3])))));
             
+            
+            if ~isempty(Xtrue)
+                residual_true=bsxfun(@minus,Xtrue,mtimesx(...
+                    obj.A,mtimesx(obj.D,...
+                    mtimesx(obj.F',permute(...
+                    obj.P,[2 1 3])))));
+                
+                
+                sum_res_true = norm(residual_true(:),'fro')^2;
+                sum_x_true = norm(Xtrue(:),'fro')^2;
+                fit_true=(1-sum_res_true/sum_x_true)*100;
+            end
+            
+            
             sum_res = 0;
             sum_x = 0;
             for k = 1:size(obj.C,1)
@@ -80,8 +94,9 @@ classdef normalParafac2 < handle
                 sum_x = sum_x + norm(obj.X(:,:,k),'fro')^2;
             end
             
+            
             fit=(1-sum_res/sum_x)*100;
-%             fit_true=(1-sum_res/norm(Xtrue(:))^2)*100;
+            
             
         end
         
