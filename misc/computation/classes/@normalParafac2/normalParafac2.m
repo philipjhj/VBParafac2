@@ -60,6 +60,9 @@ classdef normalParafac2 < handle
         end
         
         function [fit,fit_true] = Parafac2Fit(obj,Xtrue)
+            if nargin < 2
+                Xtrue = [];
+            end
             
             
             obj.D = zeros(size(obj.C,2),size(obj.C,2),size(obj.C,1));
