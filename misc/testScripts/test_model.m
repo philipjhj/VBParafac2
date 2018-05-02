@@ -76,16 +76,20 @@ normalModel=normalModel.fitParafac2(Mesti);
 %% Plot CFtPt for comparison of models
 clear; close all; colormap(flipud(colormap('gray')))
 
-savePath='/media/data/Dropbox/Studie/PhD/publications/VBParafac2/VBParafac2paper/paper/final_results/Reconstructions/';
+%localPath='/media/data/Dropbox/Studie/PhD/publications/VBParafac2/VBParafac2paper/';
+localPath='';
+savePath=[localPath,'paper/final_results/Reconstructions/'];
 
-rootFolder='/home/philipjhj/gbar_work1/VBParafac2paper/output/b722493/';
-% rootFolder_directfit='/home/philipjhj/gbar_work1/VBParafac2paper/output/b722493/';
-rootFolder_directfit='/home/philipjhj/gbar_work1/VBParafac2paper/output/fb14caa/';
+% localPath='/home/philipjhj/gbar_';
+localPath='/';
+rootFolder=[localPath,'work1/VBParafac2paper/output/b722493/'];
+rootFolder_directfit=[localPath,'work1/VBParafac2paper/output/fb14caa/'];
 
 % Uncomment to analyze wine data
 dataSetName='Wine';
-dataSetPath='rasmusBroData2/WineSingle'; Mtrue=5;
-dataSetPath_directfit='rasmusBroDataWine/WineFull'; Mtrue=5;
+dataSetPath='rasmusBroData2/WineSingle';
+dataSetPath_directfit='rasmusBroDataWine/WineFull'; 
+Mtrue=5;
 max_alpha=0.35;
 alpha_min_values=linspace(0.30,0.15,7);
 
@@ -95,8 +99,6 @@ alpha_min_values=linspace(0.30,0.15,7);
 % dataSetPath_directfit=dataSetPath;
 % max_alpha=0.7;
 % alpha_min_values=linspace(max_alpha-0.05,0.5,7);
-
-
 
 clf; 
 titles={'Direct Fit','vMF VB Homoscedastic','cMN VB Homoscedastic','vMF VB Heteroscedastic','cMN VB Heteroscedastic'};
