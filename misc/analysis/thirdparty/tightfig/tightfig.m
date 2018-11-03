@@ -78,9 +78,9 @@ function hfig = tightfig(hfig)
     
     % we will also alter the height and width of the figure to just
     % encompass the topmost and rightmost axes and lables
-    figwidth = max(pos(:,1) + pos(:,3) + ti(:,3) - moveleft);
+    figwidth = max(pos(:,1) + pos(:,3) + ti(:,3) - moveleft*0.1);
     
-    figheight = max(pos(:,2) + pos(:,4) + ti(:,4) - movedown);
+    figheight = max(pos(:,2) + pos(:,4) + ti(:,4) - movedown*0.1);
     
     % move all the axes
     for i = 1:numel(hax)

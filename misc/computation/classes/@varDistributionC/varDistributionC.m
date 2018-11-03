@@ -859,6 +859,6 @@ classdef varDistributionC < handle
                 disp(obj.(privateDependentProps{i}))
             end
         end
-        
+    
     end
 end

@@ -4,7 +4,8 @@ M = size(A,2);
 K = size(P,3);
 
 FtPt = mtimesx(F',permute(P,[2 1 3]));
-FtPtScale = max(abs(FtPt),[],2);
+%FtPtScale = max(abs(FtPt),[],2);
+FtPtScale = max(max(max(abs(FtPt))));
 %FtPtScale(FtPtScale<eps) = 0;
 FtPt = bsxfun(@times,1./FtPtScale,FtPt);
 % FtPt(isinf(FtPt)) = 0;

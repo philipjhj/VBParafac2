@@ -1,15 +1,16 @@
-classdef normalParafac2 < handle
+classdef normalParafac2 < parafac2BaseClass
     
     
     properties
         X
         A
         C
-        D
         F
         P
         
         M % # components
+        
+        D
         
         Xtrue_m
         Xrecon_m
@@ -209,8 +210,6 @@ set(gca,'fontsize',42)
         end
         
         
-    end
-        
         
 %         function nActive = nActiveComponents(obj,method)
 %             
@@ -228,7 +227,8 @@ set(gca,'fontsize',42)
 %                 nActive = find(cumsum(sort(1./obj.qAlpha.mean,'descend')/sum(1./obj.qAlpha.mean))>0.95,1);
 %             end
 %         end
-        
+      
     
+    end
 end
 

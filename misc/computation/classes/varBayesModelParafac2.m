@@ -1,4 +1,4 @@
-classdef varBayesModelParafac2 < handle
+classdef varBayesModelParafac2 < parafac2BaseClass
     properties
         qDistTrain
         qDistTest
@@ -17,6 +17,17 @@ classdef varBayesModelParafac2 < handle
         CV_ELBOS_train
         % TODO: add statistics class
     end
+    
+     properties (Dependent)
+        X
+        A
+        C
+        D
+        F
+        P
+        
+        M
+     end
     
     properties (Access = protected)
         currentPartition
@@ -39,6 +50,26 @@ classdef varBayesModelParafac2 < handle
     end
     
     methods
+        % Functions to extract the values for the variables of the base
+        function value = get.X(obj)
+            value = obj.fullData.Xunfolded;
+        end
+        function value = get.A(obj)
+            value = obj.qDistTrain.qA.mean;
+        end
+        function value = get.C(obj)
+            value = obj.qDistTrain.qC.mean;
+        end
+        function value = get.F(obj)
+            value = obj.qDistTrain.qF.mean;
+        end
+        function value = get.P(obj)
+            value = obj.qDistTrain.qP.mean;
+        end
+        function value = get.M(obj)
+            value = obj.fullData.M;
+        end
+        
         function obj = varBayesModelParafac2(data,M)
             obj.opts = optionsClass;
             obj.util = utilitiesClass(obj);

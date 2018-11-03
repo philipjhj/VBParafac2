@@ -92,7 +92,7 @@ function addaxis(varargin)
 
   
   %  parameters setting axis separation
-  axcompleft=0.12;
+  axcompleft=0.14;
   if numax == 1
     axcompright = 0.0;
   else 
