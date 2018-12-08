@@ -17,17 +17,6 @@ http://staff.utia.cz/smidl/index.php?module=pagemaster&PAGE_user_op=view_page&PA
 - multinv
 - mtimesx
 - parafac2
-
-from analysis:
-- PlotPub
 - addaxis6
-- altmany-export_fig-bb6c842
-- ciplot
-- legendflex
 - linspecer
-- matlab2tikz
-- saveTightFigure
-- tight_subplot
-- tightfig
-
-
+- tight\_subplot
