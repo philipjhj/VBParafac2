@@ -12,6 +12,3 @@ A=zeros(sb*sc,size(B,2));
 for k=1:size(B,2)
     A(:,k)=reshape(C(:,k)*B(:,k)',sb*sc,1);
 end
-
-    
-    
