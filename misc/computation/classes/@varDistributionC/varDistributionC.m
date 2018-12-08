@@ -628,30 +628,7 @@ classdef varDistributionC < handle
         end
         
         function computeqPmean(obj)
-            if strcmp(obj.opts.estimationP,'manopt')
-                
-                manifold = stiefelfactory(obj.data.J,obj.data.M);
-                problem.M = manifold;
-                problem.cost = @costFunc;
-                problem.egrad = @gradFunc;
-                %                 checkgradient(problem)
-                warning('off', 'manopt:getHessian:approx')
-                options.verbosity=0;
-                
-                for k = 1:obj.data.K
-                    
-                    gradconstant=(obj.qF.mean*obj.eD(:,:,k)*obj.eA'*obj.data.X(:,:,k))';
-                    costconstant=obj.qF.mean*obj.eD(:,:,k)*obj.eA'*obj.data.X(:,:,k);%*obj.qP.mean(:,:,k);
-                    
-                    % cost = costFunc(obj.qP.mean(:,:,k));
-                    
-                    [x,~] = trustregions(problem,[],options);
-                    % fprintf('\n Slab %d with cost diff: %.2f \n',k,cost-xcost)
-                    obj.qP.mean(:,:,k) = x;
-                    
-                end
-                
-            elseif strcmp(obj.opts.estimationP,'vonmises')
+            if strcmp(obj.opts.estimationP,'vonmises')
                 obj.qPvonmisesEntropy = 0;
                 
                 F=obj.util.hadamardProductPrSlab(obj.util.matrixProductPrSlab(obj.qF.mean,obj.eDeAtXk),...

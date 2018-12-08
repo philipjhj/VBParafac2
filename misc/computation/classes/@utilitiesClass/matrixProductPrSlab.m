@@ -43,12 +43,8 @@ switch method
                 C(:,:,k) = A*B(:,:,k);
             end
         end
-        
     case 'mtimesx'
         C = mtimesx(A,B);
-        
-    case 'mmx'
-        C = mmx('mult',A,B);
     otherwise
         C = mtimesx(A,B);
 end

@@ -21,7 +21,7 @@ classdef optionsClass < handle
         nActiveComponents = 'threshold'; % hard / threshold
         
         % Utilities options
-        matrixProductPrSlab = 'mtimesx'; % mtimesx, mmx, gpu
+        matrixProductPrSlab = 'mtimesx'; % mtimesx, gpu
         
         % RNG
         rngInput = 'shuffle'

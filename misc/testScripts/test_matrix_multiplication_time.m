@@ -14,15 +14,6 @@ disp('Loop done')
 timeit(@()mtimesx_multi(A,B,C))
 disp('mtimesx done')
 
-timeit(@()mmx_multi(A,B,C))
-disp('mmx done')
-% 
-% A = rand(dim,dim,slabs,'gpuArray');
-% B = rand(dim,dim,slabs,'gpuArray');
-% C = rand(dim,dim,slabs,'gpuArray');
-% timeGPU = gputimeit(@()GPU_multi(A,B,C))
-% disp(timeGPU)
-% disp('GPU done')
 end
 disp('All done')
 
@@ -40,8 +31,4 @@ end
 
 function D = mtimesx_multi(A,B,C)
 	D = mtimesx(mtimesx(A,B),C);
-end
-
-function D = mmx_multi(A,B,C)
-	D = mmx('mult',mmx('mult',A,B),C);
 end
