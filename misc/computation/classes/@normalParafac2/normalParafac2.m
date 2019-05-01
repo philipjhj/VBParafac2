@@ -151,65 +151,15 @@ classdef normalParafac2 < parafac2BaseClass
 %                 hold on
                 end
                 grid on
-axis tight
-if m == 2
-xlabel('Emission wavelength')
-end
-set(gca,'fontsize',42)
-            end
-            
-        end
-        
-        function obj = compute_reconstruction(obj,data)
-            
-            obj.Xrecon_m = zeros(size(obj.X,1),size(obj.X,2),size(obj.X,3),size(obj.C,2));
-            
-            
-            obj.D = zeros(size(obj.C,2),size(obj.C,2),size(obj.C,1));
-            
-            for k = 1:size(obj.C,1)
-                obj.D(:,:,k) = diag(obj.C(k,:));
-            end
-            
-            
-            A = obj.A;
-            D = obj.D;
-            F = obj.F;
-            P = obj.P;
-            
-            for m = 1:size(A,2)
-                obj.Xrecon_m(:,:,:,m) = mtimesx(...
-                    mtimesx(mtimesx(...
-                    A(:,m),D(m,m,:)),F(:,m)'),permute(P,[2 1 3]));
-            end
-            
-            obj.Xrecon = sum(obj.Xrecon_m,4);
-            
-            if nargin>1
-            if ~isempty(data.Xtrue) && isempty(obj.Xtrue_m) 
-                
-                obj.Xtrue_m = zeros(size(obj.X,1),size(obj.X,2),size(obj.X,3),size(obj.C,1));
-                
-                A = data.Atrue;
-                D = bsxfun(@mtimes,reshape(data.Ctrue',1,...
-                data.Mtrue,data.K),...
-                repmat(eye(data.Mtrue),1,1,data.K));
-                F = data.Ftrue;
-                P = data.Ptrue;
-                
-                for m = 1:data.Mtrue
-                    obj.Xtrue_m(:,:,:,m) = mtimesx(...
-                        mtimesx(mtimesx(...
-                        A(:,m),D(m,m,:)),F(:,m)'),permute(P,[2 1 3]));
+                axis tight
+                if m == 2
+                xlabel('Emission wavelength')
                 end
-                
-                
+                set(gca,'fontsize',42)
             end
             
-            end
         end
-        
-        
+       
         
 %         function nActive = nActiveComponents(obj,method)
 %             
