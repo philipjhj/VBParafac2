@@ -6,7 +6,7 @@ measures_temp=measures;
 [D1,D2] = size(measures);
 
 % assert(all(size(measures)==D),'The input was not a square matrix!')
-assert(all(measures(:)>0),'A measure was negative, this is not supported.')
+assert(all(measures(:)>=0),'A measure was negative, this is not supported.')
 
 idx = nan(D2,1);
 matched_measure = nan(D2,1);
