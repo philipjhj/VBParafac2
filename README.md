@@ -19,6 +19,7 @@ http://staff.utia.cz/smidl/index.php?module=pagemaster&PAGE_user_op=view_page&PA
 - parafac2
 - addaxis6
 - linspecer
+- Hint2RGB
 - tight\_subplot
 
 # Setup
