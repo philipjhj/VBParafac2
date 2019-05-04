@@ -22,6 +22,13 @@ http://staff.utia.cz/smidl/index.php?module=pagemaster&PAGE_user_op=view_page&PA
 - Hint2RGB
 - tight\_subplot
 
+## Other third party
+- following files from the N-way toolbox (found here: http://www.models.life.ku.dk/nwaytoolbox/download)
+    - corcond.m 
+    - nident.m 
+    - nshape.m 
+    - t3core.m
+
 # Setup
 
 ## mtimesx
