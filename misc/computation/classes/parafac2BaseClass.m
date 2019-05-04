@@ -60,14 +60,18 @@ classdef parafac2BaseClass < handle
             
             profiles=obj.compute_profiles(include_scale, normalize, attempt_flip);
             
-            
-            for m = 1:obj.M
-                
+            Ms=[];
+            for i = unique(colors,'rows')'
+                Ms=[Ms find(ismember(colors,i','rows'))']; 
+            end
+%             disp(Ms)
+%             disp(obj.M)
+            for m = fliplr(Ms)
+%                 disp(m)
                 plts(:,m)=plot(squeeze(profiles(m,:,:)),'color',colors(m,:),'LineWidth',1.7);
                 
-                if m==1
-                    hold on
-                end
+               
+                hold on
             end
             hold off
         end

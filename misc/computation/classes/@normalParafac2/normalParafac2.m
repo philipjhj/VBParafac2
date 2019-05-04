@@ -159,24 +159,6 @@ classdef normalParafac2 < parafac2BaseClass
             end
             
         end
-       
-        
-%         function nActive = nActiveComponents(obj,method)
-%             
-%             if nargin<2
-%                method = obj.opts.nActiveComponents; 
-%             end
-%             
-%             if strcmp(method,'hard')
-%                 if isa(obj.qC.mean,'gpuArray')
-%                     nActive = sum(sum(gather(obj.qC.mean))~=0);
-%                 else
-%                     nActive = sum(sum(obj.qC.mean)~=0);
-%                 end
-%             elseif strcmp(method,'threshold')
-%                 nActive = find(cumsum(sort(1./obj.qAlpha.mean,'descend')/sum(1./obj.qAlpha.mean))>0.95,1);
-%             end
-%         end
       
     
     end
