@@ -38,10 +38,16 @@ classdef normalParafac2 < parafac2BaseClass
             end
         end
         
-        function obj = fitParafac2(obj,M)
-            
+        function obj = fitParafac2(obj,M, convergence_tol, max_iter)
+            if ~exist('convergence_tol','var')
+                convergence_tol = 1e-9;
+            end 
+            if ~exist('max_iter','var')
+                convergence_tol = 1e4;
+            end 
+
             obj.M = M;
-            [A,F,C,P,modelFit]=parafac2(obj.X,obj.M,[0 0],[1e-12 10000 0 0 1]);
+            [A,F,C,P,modelFit]=parafac2(obj.X,obj.M,[0 0],[convergence_tol max_iter 0 0 1]);
             obj.A = A;
             obj.F = F;
             obj.C = C;
