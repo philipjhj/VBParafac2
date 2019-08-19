@@ -63,6 +63,6 @@ set(gcf,'Units','Normal')
 set(gca, 'Visible', 'off')%, 'Position', [0.05 0.05 0.9 0.9]);%,'OuterPosition',[0 0 0 0);
 
 hold on
-patch(xvals', yvals', color', 'Edgecolor', 'none');
-% axis equal;
+patch(xvals', yvals', 'black', 'Edgecolor', 'none');
+ axis equal;
 

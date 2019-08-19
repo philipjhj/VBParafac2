@@ -8,10 +8,11 @@ FtPtScale = max(abs(FtPt),[],2);
 
 %FtPtScale(FtPtScale<eps) = 0;
 FtPt = bsxfun(@times,1./FtPtScale,FtPt);
-% FtPt(isinf(FtPt)) = 0;
+FtPt(isnan(FtPt)) = 0;
 
 AScale = max(abs(A),[],1);
 A = bsxfun(@times,1./AScale,A);
+A(isnan(A))=0
 
 C = C*diag(AScale).*permute(FtPtScale,[3 1 2]);
 
