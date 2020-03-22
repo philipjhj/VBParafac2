@@ -809,6 +809,26 @@ classdef varDistributionC < handle
         
         % #################################################################
         % # Statistics methods
+        function idxActive = idxActiveComponents(obj, method)
+            
+            if nargin<2
+                method = obj.opts.nActiveComponents;
+            end
+            
+            if strcmp(method,'hard')
+                idxActive = sum(obj.qC.mean,1);
+            elseif strcmp(method,'threshold')
+                if ~strcmp(obj.opts.estimationARD,'maxNoARD')
+                    [sorted_explained_var, sorted_idx]=sort((1./obj.qAlpha.mean)/sum(1./obj.qAlpha.mean),'descend');
+                    nActive=find(cumsum(sorted_explained_var)>0.95,1);
+                    idxActive=sorted_idx(1:nActive);
+                else
+                    idxActive=-1; % not available
+                end
+            end
+            idxActive = gather(idxActive);
+        end
+
         function nActive = nActiveComponents(obj,method)
             
             if nargin<2
