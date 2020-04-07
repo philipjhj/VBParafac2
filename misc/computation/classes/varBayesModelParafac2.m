@@ -623,15 +623,15 @@ classdef varBayesModelParafac2 < parafac2BaseClass
                         generatedData.Ftrue'*generatedData.Ptrue(:,:,k)';
                 end
                 
-                ssq = generatedData.computeNoiseLevel(generatedData,dataSettings.SNR);
+                ssq = generatedData.computeNoiseLevel(generatedData, dataSettings.SNR);
                 
                 if strcmp(dataSettings.noiseType,'heteroscedastic')
-                    pp=rand(1,generatedData.K);
+                    pp=rand(1, generatedData.K);
                 elseif strcmp(dataSettings.noiseType,'homoscedastic')
-                    pp=ones(1,generatedData.K);
+                    pp=ones(1, generatedData.K);
                 end
                 
-                bar(pp/sum(pp))
+                %bar(pp/sum(pp))
                 pp=pp/sum(pp)*generatedData.K;
                 
                 generatedData.Sigmatrue = ssq;
@@ -685,8 +685,6 @@ classdef varBayesModelParafac2 < parafac2BaseClass
                     generatedData.X(:,:,k) = generatedData.Xtrue(:,:,k)+generatedData.Etrue(:,:,k);
                 end
             end
-            
-            
         end
     end
 end
