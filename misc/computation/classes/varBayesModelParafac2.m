@@ -91,8 +91,8 @@ classdef varBayesModelParafac2 < parafac2BaseClass
             obj.dataTrain.partitionName = 'Train';
             obj.dataTest.partitionName = 'Test';
             
-            obj.qDistTrain = varDistributionC(obj,obj.dataTrain);
-            obj.qDistTest = varDistributionC(obj,obj.dataTest);
+            obj.qDistTrain = varDistributionC(obj.dataTrain, obj.opts, obj.util);
+            obj.qDistTest = varDistributionC(obj.dataTest, obj.opts, obj.util);
             
             obj.ListenerPartitionUpdates = addlistener(obj,'partitionUpdate',@obj.setCurrentPartitionNames);
         end
@@ -352,6 +352,31 @@ classdef varBayesModelParafac2 < parafac2BaseClass
                 obj.(obj.currentqDist).qAlpha.alpha = gather(obj.(obj.currentqDist).qAlpha.alpha);
                 obj.(obj.currentqDist).qAlpha.beta= gather(obj.(obj.currentqDist).qAlpha.beta);
             end
+        end
+        
+        
+        function [varDistFitted, value_ELBO] = evaluateELBO(obj, new_data)
+
+            % New var dist with same parameters
+            varDistFitted = varDistributionC(new_data, obj.opts, obj.util);
+            %varDistFitted.opts.activeParams = {};
+
+            varDistFitted.qA = obj.qDistTrain.qA;
+            varDistFitted.qF = obj.qDistTrain.qF;
+            varDistFitted.qC = obj.qDistTrain.qC;
+            varDistFitted.qP = obj.qDistTrain.qP;
+            varDistFitted.qSigma = obj.qDistTrain.qSigma;
+            varDistFitted.qAlpha = obj.qDistTrain.qAlpha;
+
+            varDistFitted.pSigma = obj.qDistTrain.pSigma;
+            varDistFitted.pAlpha = obj.qDistTrain.pAlpha;
+
+            % Compute ELBO
+            varDistFitted.initializeSufficientStatistics;
+            varDistFitted.computeqPmean; % This should be refactored?
+            
+            %varDistFitted.updateMoments;
+            value_ELBO = varDistFitted.ELBO;
         end
         
         % TODO: refactor all code below!
