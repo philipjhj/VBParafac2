@@ -355,28 +355,58 @@ classdef varBayesModelParafac2 < parafac2BaseClass
         end
         
         
-        function [varDistFitted, value_ELBO] = evaluateELBO(obj, new_data)
+        %function [varDistFitted, value_ELBO] = evaluateELBO(obj, X_test)
+        function ELBO = evaluateELBO(obj, X_test)
 
-            % New var dist with same parameters
-            varDistFitted = varDistributionC(new_data, obj.opts, obj.util);
-            %varDistFitted.opts.activeParams = {};
+            test_data = dataClass;
+            test_data.Xunfolded = X_test;
 
-            varDistFitted.qA = obj.qDistTrain.qA;
-            varDistFitted.qF = obj.qDistTrain.qF;
-            varDistFitted.qC = obj.qDistTrain.qC;
-            varDistFitted.qP = obj.qDistTrain.qP;
-            varDistFitted.qSigma = obj.qDistTrain.qSigma;
-            varDistFitted.qAlpha = obj.qDistTrain.qAlpha;
+            test_model=varBayesModelParafac2(test_data, obj.fullData.M);
 
-            varDistFitted.pSigma = obj.qDistTrain.pSigma;
-            varDistFitted.pAlpha = obj.qDistTrain.pAlpha;
+            test_model.qDistTrain.qA= obj.qDistTrain.qA;
+            test_model.qDistTrain.qF= obj.qDistTrain.qF;
+            test_model.qDistTrain.qC= obj.qDistTrain.qC;
+            test_model.qDistTrain.qP= obj.qDistTrain.qP;
+            test_model.qDistTrain.qSigma= obj.qDistTrain.qSigma;
+            test_model.qDistTrain.qAlpha= obj.qDistTrain.qAlpha;
 
-            % Compute ELBO
-            varDistFitted.initializeSufficientStatistics;
-            varDistFitted.computeqPmean; % This should be refactored?
-            
-            %varDistFitted.updateMoments;
-            value_ELBO = varDistFitted.ELBO;
+            %varDistFitted.pSigma = obj.qDistTrain.pSigma;
+            %varDistFitted.pAlpha = obj.qDistTrain.pAlpha;
+
+            test_model.opts=obj.opts;
+
+            test_model.opts.verbose = 1;
+            test_model.opts.showIter = 1000;
+            test_model.opts.debugFlag = 0;
+            test_model.opts.rngInput = 1;
+            test_model.opts.activeParams = {'qC','qP','qF'};
+
+            test_model.partitionData(test_model.fullData.X)
+            test_model.fitTrainingData;
+
+            ELBO=test_model.qDistTrain.ELBO;
+  
+
+            %% New var dist with same parameters
+            %varDistFitted = varDistributionC(new_data, obj.opts, obj.util);
+            %%varDistFitted.opts.activeParams = {};
+
+            %varDistFitted.qA = obj.qDistTrain.qA;
+            %varDistFitted.qF = obj.qDistTrain.qF;
+            %varDistFitted.qC = obj.qDistTrain.qC;
+            %varDistFitted.qP = obj.qDistTrain.qP;
+            %varDistFitted.qSigma = obj.qDistTrain.qSigma;
+            %varDistFitted.qAlpha = obj.qDistTrain.qAlpha;
+
+            %varDistFitted.pSigma = obj.qDistTrain.pSigma;
+            %varDistFitted.pAlpha = obj.qDistTrain.pAlpha;
+
+            %% Compute ELBO
+            %varDistFitted.initializeSufficientStatistics;
+            %varDistFitted.computeqPmean; % This should be refactored?
+            %
+            %%varDistFitted.updateMoments;
+            %value_ELBO = varDistFitted.ELBO;
         end
         
         % TODO: refactor all code below!
