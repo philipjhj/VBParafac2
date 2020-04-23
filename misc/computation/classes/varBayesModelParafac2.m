@@ -354,59 +354,67 @@ classdef varBayesModelParafac2 < parafac2BaseClass
             end
         end
         
-        
-        %function [varDistFitted, value_ELBO] = evaluateELBO(obj, X_test)
-        function ELBO = evaluateELBO(obj, X_test)
+        function [ELBO, best_model] = evaluateELBO(obj, X_test)
 
             test_data = dataClass;
             test_data.Xunfolded = X_test;
 
-            test_model=varBayesModelParafac2(test_data, obj.fullData.M);
+            old_verbose=obj.opts.verbose;
+            old_showIter=obj.opts.showIter;
+            old_maxIter=obj.opts.maxIter;
+            old_rngInput=obj.opts.rngInput; %randi(10);
+            old_activeParams = obj.opts.activeParams;
+            
+            test_opts=obj.opts;
 
-            test_model.qDistTrain.qA= obj.qDistTrain.qA;
-            test_model.qDistTrain.qF= obj.qDistTrain.qF;
-            test_model.qDistTrain.qC= obj.qDistTrain.qC;
-            test_model.qDistTrain.qP= obj.qDistTrain.qP;
-            test_model.qDistTrain.qSigma= obj.qDistTrain.qSigma;
-            test_model.qDistTrain.qAlpha= obj.qDistTrain.qAlpha;
+            test_opts.verbose = 0;
+            test_opts.maxIter = 1e4;
+            test_opts.initMethod = 'random';
+            
+            %test_opts.showIter = 100;
+            %test_opts.debugFlag = 0;
+            
+            test_opts.activeParams = {'qC','qP'};%,'qSigma'};
+            
+            n_init=50;
+            ELBO=-realmax;
+            for i = 1:n_init
+                test_model=varBayesModelParafac2(test_data, obj.fullData.M);
+                test_model.opts=test_opts;
+                test_model.qDistTrain.opts=test_opts;
+                
+                test_model.partitionData(test_model.fullData.X)
+                test_model.currentPartition = test_model.dataTrain.partitionName;
+                trainTic=tic;
+                rng(i);
+                test_model.qDistTrain.initializeVariationalDististribution;
 
-            %varDistFitted.pSigma = obj.qDistTrain.pSigma;
-            %varDistFitted.pAlpha = obj.qDistTrain.pAlpha;
+                test_model.qDistTrain.qA=obj.qDistTrain.qA;
+                test_model.qDistTrain.qF=obj.qDistTrain.qF;
+                %test_model.qDistTrain.qC= obj.qDistTrain.qC;
+                %test_model.qDistTrain.qP= obj.qDistTrain.qP;
+                test_model.qDistTrain.qSigma=obj.qDistTrain.qSigma;
+                test_model.qDistTrain.qAlpha=obj.qDistTrain.qAlpha;
 
-            test_model.opts=obj.opts;
+                test_model.qDistTrain.initializeSufficientStatistics;
+                test_model.computeVarDistribution;
+                trainToc=toc(trainTic);
+                %test_model.fitTrainingData;
 
-            test_model.opts.verbose = 1;
-            test_model.opts.showIter = 1000;
-            test_model.opts.debugFlag = 0;
-            test_model.opts.rngInput = 1;
-            test_model.opts.activeParams = {'qC','qP','qF'};
-
-            test_model.partitionData(test_model.fullData.X)
-            test_model.fitTrainingData;
-
-            ELBO=test_model.qDistTrain.ELBO;
-  
-
-            %% New var dist with same parameters
-            %varDistFitted = varDistributionC(new_data, obj.opts, obj.util);
-            %%varDistFitted.opts.activeParams = {};
-
-            %varDistFitted.qA = obj.qDistTrain.qA;
-            %varDistFitted.qF = obj.qDistTrain.qF;
-            %varDistFitted.qC = obj.qDistTrain.qC;
-            %varDistFitted.qP = obj.qDistTrain.qP;
-            %varDistFitted.qSigma = obj.qDistTrain.qSigma;
-            %varDistFitted.qAlpha = obj.qDistTrain.qAlpha;
-
-            %varDistFitted.pSigma = obj.qDistTrain.pSigma;
-            %varDistFitted.pAlpha = obj.qDistTrain.pAlpha;
-
-            %% Compute ELBO
-            %varDistFitted.initializeSufficientStatistics;
-            %varDistFitted.computeqPmean; % This should be refactored?
-            %
-            %%varDistFitted.updateMoments;
-            %value_ELBO = varDistFitted.ELBO;
+                if ELBO < test_model.qDistTrain.ELBO
+                    ELBO=test_model.qDistTrain.ELBO;
+                    best_model=test_model;
+                    fprintf('Current best model: %d components, ELBO=%f\n', ...
+                        test_model.qDistTrain.nActiveComponents('hard'),ELBO)
+                end
+                fprintf('%d / %d completed, took %.2f seconds\n',i,n_init,trainToc)
+            end
+            
+            obj.opts.verbose=old_verbose;
+            obj.opts.showIter=old_showIter;
+            obj.opts.maxIter=old_maxIter;
+            obj.opts.rngInput=old_rngInput; %randi(10);
+            obj.opts.activeParams = old_activeParams;
         end
         
         % TODO: refactor all code below!
@@ -546,6 +554,11 @@ classdef varBayesModelParafac2 < parafac2BaseClass
                 obj.util.matrixProductPrSlab(qDist.qF.mean',permute(...
                 qDist.qP.mean,[2 1 3])))));
             
+            sum_res = norm(residual(:),'fro')^2;
+            sum_x = norm(qDist.data.X(:),'fro')^2;
+            
+            fit=gather((1-sum_res/sum_x)*100); 
+            
             if ~isempty(Xtrue)
             residual_true=bsxfun(@minus,Xtrue,obj.util.matrixProductPrSlab(...
                 qDist.qA.mean,obj.util.matrixProductPrSlab(qDist.eD,...
@@ -554,12 +567,12 @@ classdef varBayesModelParafac2 < parafac2BaseClass
                 sum_res_true = norm(residual_true(:),'fro')^2;
                 sum_x_true = norm(Xtrue(:),'fro')^2;
                 fit_true=gather((1-sum_res_true/sum_x_true)*100);
-            end
+                
+                sum_res = norm(residual(:),'fro')^2;
+                sum_x = norm(Xtrue(:),'fro')^2;
+            end                       
             
-            
-            sum_res = norm(residual(:),'fro')^2;
-            sum_x = norm(qDist.data.X(:),'fro')^2;
-            fit=gather((1-sum_res/sum_x)*100);   
+              
             
         end
         
@@ -649,14 +662,16 @@ classdef varBayesModelParafac2 < parafac2BaseClass
                 for m = 1:M
                     F(m,m) = 1;
                 end
-                
+                disp('Perform Cholesky factorization on F')
                 generatedData.Ftrue = chol(F);
+                
                 
                 if M>1
                     score = zeros(M);
                     score(1,2) = 1;
-                    i=0;
+                    i=1;
                     while any(any(nonzeros(score)>0.8))
+                        fprintf('%d attempt to create the C matrix\n',i)
                         C = rand(K,M);
                         for m1 = 1:M
                             for m2 = (m1+1):M
@@ -664,6 +679,8 @@ classdef varBayesModelParafac2 < parafac2BaseClass
                             end
                         end
                         i = i+1;
+                        fprintf('%d / %d with too large congruence score\n',sum(sum(nonzeros(score)>0.8)),M^2)
+                        
                     end
                 else
                     C = rand(K,M);
@@ -673,6 +690,7 @@ classdef varBayesModelParafac2 < parafac2BaseClass
                 generatedData.Etrue = zeros(I,J,K);
                 
                 for k = 1:generatedData.K
+                    fprintf('Processing slab %d / %d\n',k , generatedData.K)
                     generatedData.Ptrue(:,:,k) = orth(mvnrnd(zeros(generatedData.J,generatedData.Mtrue),eye(generatedData.Mtrue)));
                     generatedData.Xtrue(:,:,k) = generatedData.Atrue*diag(generatedData.Ctrue(k,:))*...
                         generatedData.Ftrue'*generatedData.Ptrue(:,:,k)';
@@ -699,10 +717,10 @@ classdef varBayesModelParafac2 < parafac2BaseClass
                 generatedData.Xunfolded = generatedData.Xtrue+generatedData.Etrue;
                 
                 snr=(norm(generatedData.Xtrue(:),'fro')^2/norm(generatedData.Etrue(:),'fro')^2);
-%                 disp('SNR')
-%                 disp(snr)
-%                 disp('SNR (dB)')
-%                 disp(10*log10(snr))
+                 disp('SNR')
+                 disp(snr)
+                 disp('SNR (dB)')
+                 disp(10*log10(snr))
 %                 disp('Noise / Signal strength')
 %                 disp((norm(generatedData.Etrue(:),'fro')^2/norm(generatedData.Xtrue(:),'fro')^2)*100)
 %                 disp('Signal %')
