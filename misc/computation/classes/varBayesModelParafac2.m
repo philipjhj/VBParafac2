@@ -665,22 +665,26 @@ classdef varBayesModelParafac2 < parafac2BaseClass
                 disp('Perform Cholesky factorization on F')
                 generatedData.Ftrue = chol(F);
                 
-                
+
                 if M>1
-                    score = zeros(M);
-                    score(1,2) = 1;
-                    i=1;
-                    while any(any(nonzeros(score)>0.8))
-                        fprintf('%d attempt to create the C matrix\n',i)
-                        C = rand(K,M);
-                        for m1 = 1:M
-                            for m2 = (m1+1):M
-                                score(m1,m2) = congruenceScore(C(:,m1),C(:,m2));
-                            end
+                    C = zeros(K,M);
+                    C(:,1) = rand(K,1);
+                    m=1;
+                    n_failures=0;
+                    
+                    while m < M  
+                        col_new=rand(K,1);
+                        scores=zeros(1,m);
+                        for i_comp = 1:m
+                            scores(i_comp)=congruenceScore(C(:,i_comp),col_new);
                         end
-                        i = i+1;
-                        fprintf('%d / %d with too large congruence score\n',sum(sum(nonzeros(score)>0.8)),M^2)
-                        
+                        if all(scores<0.8)
+                            m=m+1;
+                            C(:,m)=col_new;
+                        else
+                            n_failures=n_failures+1;
+                        end
+                        fprintf('Found %d / %d components; %d failed attempts\n',m,M,n_failures)
                     end
                 else
                     C = rand(K,M);
