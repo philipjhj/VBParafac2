@@ -373,10 +373,13 @@ classdef varBayesModelParafac2 < parafac2BaseClass
             
             %test_opts.showIter = 100;
             %test_opts.debugFlag = 0;
+            if strcmp(obj.opts.estimationNoise,'avg')
+                test_opts.activeParams = {'qC','qP','qSigma'};
+            elseif strcmp(obj.opts.estimationNoise,'avgShared')
+                 test_opts.activeParams = {'qC','qP'};
+            end
             
-            test_opts.activeParams = {'qC','qP'};%,'qSigma'};
-            
-            n_init=50;
+            n_init=10;
             ELBO=-realmax;
             for i = 1:n_init
                 test_model=varBayesModelParafac2(test_data, obj.fullData.M);
@@ -393,7 +396,11 @@ classdef varBayesModelParafac2 < parafac2BaseClass
                 test_model.qDistTrain.qF=obj.qDistTrain.qF;
                 %test_model.qDistTrain.qC= obj.qDistTrain.qC;
                 %test_model.qDistTrain.qP= obj.qDistTrain.qP;
-                test_model.qDistTrain.qSigma=obj.qDistTrain.qSigma;
+                
+                if strcmp(obj.opts.estimationNoise,'avgShared')
+                    test_model.qDistTrain.qSigma=obj.qDistTrain.qSigma;
+                end
+                
                 test_model.qDistTrain.qAlpha=obj.qDistTrain.qAlpha;
 
                 test_model.qDistTrain.initializeSufficientStatistics;
