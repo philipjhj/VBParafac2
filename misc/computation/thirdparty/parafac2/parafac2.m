@@ -811,7 +811,14 @@ if ConstB ~= 10 % Then B is eye
    A        = A*diag(normA.^(-1));
    C        = C*diag(normC.^(-1));
    
+   % Handle zero variance components
+   A(isnan(A)) = 0;
+   C(isnan(C)) = 0;
+   
    % APPLY SIGN CONVENTION
+%    if any(any(isnan(A))) | any(any(isnan(C)))
+%    disp('stop')
+%    end
    SignA = sign(sum(sign(A))+eps);
    SignC = sign(sum(sign(C))+eps);
    A = A*diag(SignA);
