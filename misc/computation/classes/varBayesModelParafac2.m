@@ -354,7 +354,7 @@ classdef varBayesModelParafac2 < parafac2BaseClass
             end
         end
         
-        function [ELBO, best_model] = evaluateELBO(obj, X_test)
+        function [ELBO, best_model] = evaluateELBO(obj, X_test, n_init)
 
             test_data = dataClass;
             test_data.Xunfolded = X_test;
@@ -369,7 +369,7 @@ classdef varBayesModelParafac2 < parafac2BaseClass
 
             test_opts.verbose = 0;
             test_opts.maxIter = 1e4;
-            test_opts.initMethod = 'random';
+            test_opts.initMethod = 'mle';
             
             %test_opts.showIter = 100;
             %test_opts.debugFlag = 0;
@@ -379,7 +379,9 @@ classdef varBayesModelParafac2 < parafac2BaseClass
                  test_opts.activeParams = {'qC','qP'};
             end
             
-            n_init=10;
+            if nargin < 3
+               n_init=10;
+            end
             ELBO=-realmax;
             for i = 1:n_init
                 test_model=varBayesModelParafac2(test_data, obj.fullData.M);

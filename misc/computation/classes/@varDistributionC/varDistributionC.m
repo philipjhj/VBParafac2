@@ -121,7 +121,14 @@ classdef varDistributionC < handle
                 else
                     X = obj.data.X;
                 end
-                [A,F,C,P,modelFit]=parafac2(X,obj.data.M,[0 0],[0 0 0 0 1]);
+                if size(X,3) == 1
+                    % For evaluating test input (A and F should already have been fitted)
+                    A=obj.qA.mean;
+                    F=obj.qF.mean;
+                    [A,F,C,P,modelFit]=partial_parafac2(X,obj.data.M,[0 0],[0 0 0 0 1],A,F);
+                else
+                    [A,F,C,P,modelFit]=parafac2(X,obj.data.M,[0 0],[0 0 0 0 1]);
+                end
                 noise=0;
                 obj.qA.mean = A+noise*randn(size(A));
                 obj.qF.mean = F+noise*randn(size(F));
