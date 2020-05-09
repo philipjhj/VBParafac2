@@ -534,14 +534,14 @@ while abs(fit-oldfit)>oldfit*ConvCrit & it<MaxIt & fit>1000*eps
     % Print interim result
     if rem(it,ShowFit)==0|it == 1
        if Options(5)==0
-          fprintf(' %12.10f       %g        %3.4f \n',fit,it,100*(1-fit/fit0));
-          subplot(2,2,1)
-          plot(A),title('First mode')
-          subplot(2,2,2)
-          plot(C),title('Third mode')
-          subplot(2,2,3)
-          plot(P{1}*H),title('Second mode (only first k-slab shown)')
-          drawnow
+           fprintf(' %12.10f       %g        %3.4f \n',fit,it,100*(1-fit/fit0));
+%           subplot(2,2,1)
+%           plot(A),title('First mode')
+%           subplot(2,2,2)
+%           plot(C),title('Third mode')
+%           subplot(2,2,3)
+%           plot(P{1}*H),title('Second mode (only first k-slab shown)')
+%           drawnow
        end
     end
 
