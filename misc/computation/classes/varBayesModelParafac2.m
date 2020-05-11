@@ -70,8 +70,12 @@ classdef varBayesModelParafac2 < parafac2BaseClass
             value = obj.fullData.M;
         end
         
-        function obj = varBayesModelParafac2(data,M)
-            obj.opts = optionsClass;
+        function obj = varBayesModelParafac2(data,M, opts)
+            if nargin < 3
+                 obj.opts = optionsClass;
+            else
+                obj.opts = opts;
+            end
             obj.util = utilitiesClass(obj);
             
             % TODO: Do not partition data here, gather full data first,
@@ -94,7 +98,7 @@ classdef varBayesModelParafac2 < parafac2BaseClass
             obj.qDistTrain = varDistributionC(obj.dataTrain, obj.opts, obj.util);
             obj.qDistTest = varDistributionC(obj.dataTest, obj.opts, obj.util);
             
-            obj.ListenerPartitionUpdates = addlistener(obj,'partitionUpdate',@obj.setCurrentPartitionNames);
+            %obj.ListenerPartitionUpdates = addlistener(obj,'partitionUpdate',@obj.setCurrentPartitionNames);
         end
         
         function crossValidateM(obj,Minterval)
@@ -185,7 +189,8 @@ classdef varBayesModelParafac2 < parafac2BaseClass
         
         function set.currentPartition(obj,name)
             obj.currentPartition = name;
-            notify(obj,'partitionUpdate');
+            obj.setCurrentPartitionNames
+            %notify(obj,'partitionUpdate');
         end
         function setCurrentPartitionNames(obj,~,~)
             obj.currentData = strcat('data',obj.currentPartition);
@@ -353,62 +358,80 @@ classdef varBayesModelParafac2 < parafac2BaseClass
                 obj.(obj.currentqDist).qAlpha.beta= gather(obj.(obj.currentqDist).qAlpha.beta);
             end
         end
+
+        function initialize_from_existing_model(obj, model)
+
+            if model.M > obj.M
+                disp('number of components is too large in previous model')
+            end
+
+            
+            obj.partitionData(obj.fullData.X)
+            obj.currentPartition = obj.dataTrain.partitionName;
+            obj.qDistTrain.initializeVariationalDististribution;
+
+            M_old = size(model.qDistTrain.qA.mean,2);
+
+            obj.qDistTrain.qA.mean(:,1:M_old)=model.qDistTrain.qA.mean;
+            obj.qDistTrain.qA.variance(1:M_old,1:M_old)=model.qDistTrain.qA.variance;
+            obj.qDistTrain.qF.mean(1:M_old,1:M_old)=model.qDistTrain.qF.mean;
+            obj.qDistTrain.qF.variance(1:M_old,1:M_old,1:M_old)=model.qDistTrain.qF.variance;
+
+            obj.qDistTrain.qAlpha.mean(1:M_old)=model.qDistTrain.qAlpha.mean;
+            obj.qDistTrain.qAlpha.variance(1:M_old)=model.qDistTrain.qAlpha.variance;
+            obj.qDistTrain.qAlpha.beta(1:M_old)=model.qDistTrain.qAlpha.beta;
+            obj.qDistTrain.qAlpha.alpha(1:M_old)=model.qDistTrain.qAlpha.alpha;
+            
+            if strcmp(obj.opts.estimationNoise,'avgShared')
+                obj.qDistTrain.qSigma.mean=model.qDistTrain.qSigma.mean;
+                obj.qDistTrain.qSigma.variance=model.qDistTrain.qSigma.variance;
+                obj.qDistTrain.qSigma.beta=model.qDistTrain.qSigma.beta;
+                obj.qDistTrain.qSigma.alpha=model.qDistTrain.qSigma.alpha;
+            end
+
+            obj.qDistTrain.initializeSufficientStatistics;
+        end
         
         function [ELBO, best_model] = evaluateELBO(obj, X_test, n_init)
-
-            test_data = dataClass;
-            test_data.Xunfolded = X_test;
 
             old_verbose=obj.opts.verbose;
             old_showIter=obj.opts.showIter;
             old_maxIter=obj.opts.maxIter;
             old_rngInput=obj.opts.rngInput; %randi(10);
             old_activeParams = obj.opts.activeParams;
+
+            test_data = dataClass;
+            test_data.Xunfolded = X_test;
+
             
             test_opts=obj.opts;
-
             test_opts.verbose = 0;
             test_opts.maxIter = 1e4;
             test_opts.initMethod = 'mle';
-            
-            %test_opts.showIter = 100;
-            %test_opts.debugFlag = 0;
+
             if strcmp(obj.opts.estimationNoise,'avg')
                 test_opts.activeParams = {'qC','qP','qSigma'};
             elseif strcmp(obj.opts.estimationNoise,'avgShared')
-                 test_opts.activeParams = {'qC','qP'};
+                test_opts.activeParams = {'qC','qP'};
             end
+            
+            % NOT USED
+            %test_opts.showIter = 100;
+            %test_opts.debugFlag = 0;
             
             if nargin < 3
                n_init=10;
             end
             ELBO=-realmax;
             for i = 1:n_init
-                test_model=varBayesModelParafac2(test_data, obj.fullData.M);
-                test_model.opts=test_opts;
-                test_model.qDistTrain.opts=test_opts;
-                
-                test_model.partitionData(test_model.fullData.X)
-                test_model.currentPartition = test_model.dataTrain.partitionName;
+                test_model=varBayesModelParafac2(test_data, obj.fullData.M, test_opts);
+
                 trainTic=tic;
                 rng(i);
-                test_model.qDistTrain.initializeVariationalDististribution;
+                test_model.initialize_from_existing_model(obj)
 
-                test_model.qDistTrain.qA=obj.qDistTrain.qA;
-                test_model.qDistTrain.qF=obj.qDistTrain.qF;
-                %test_model.qDistTrain.qC= obj.qDistTrain.qC;
-                %test_model.qDistTrain.qP= obj.qDistTrain.qP;
-                
-                if strcmp(obj.opts.estimationNoise,'avgShared')
-                    test_model.qDistTrain.qSigma=obj.qDistTrain.qSigma;
-                end
-                
-                test_model.qDistTrain.qAlpha=obj.qDistTrain.qAlpha;
-
-                test_model.qDistTrain.initializeSufficientStatistics;
                 test_model.computeVarDistribution;
                 trainToc=toc(trainTic);
-                %test_model.fitTrainingData;
 
                 if ELBO < test_model.qDistTrain.ELBO
                     ELBO=test_model.qDistTrain.ELBO;
@@ -418,12 +441,12 @@ classdef varBayesModelParafac2 < parafac2BaseClass
                 end
                 fprintf('%d / %d completed, took %.2f seconds\n',i,n_init,trainToc)
             end
-            
+
             obj.opts.verbose=old_verbose;
             obj.opts.showIter=old_showIter;
             obj.opts.maxIter=old_maxIter;
             obj.opts.rngInput=old_rngInput; %randi(10);
-            obj.opts.activeParams = old_activeParams;
+            obj.opts.activeParams=old_activeParams;
         end
         
         % TODO: refactor all code below!

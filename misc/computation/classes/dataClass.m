@@ -66,23 +66,25 @@ classdef dataClass < handle
     
     methods
         function obj = dataClass()
-            obj.ListenerDataUpdates = addlistener(obj,'dataUpdated',@obj.setDimensions);
-            obj.ListenerELBOUpdates = addlistener(obj,'ELBOUpdated',@obj.updateELBOvalues);
+            %obj.ListenerDataUpdates = addlistener(obj,'dataUpdated',@obj.setDimensions);
+            %obj.ListenerELBOUpdates = addlistener(obj,'ELBOUpdated',@obj.updateELBOvalues);
         end
         
         function set.ELBO(obj,ELBO_new)
             ELBOupdate = newValueELBOevent(ELBO_new);
-            notify(obj,'ELBOUpdated',ELBOupdate)
+            %notify(obj,'ELBOUpdated',ELBOupdate)
+            obj.updateELBOvalues(ELBOupdate);
             obj.ELBO = ELBO_new;
         end
-        function updateELBOvalues(obj,~, ELBOupdate)
+        function updateELBOvalues(obj,ELBOupdate)
             obj.ELBO_prev = obj.ELBO;
             obj.ELBO_diff = ELBOupdate.newValue-obj.ELBO_prev;
         end
         
         function set.Xunfolded(obj,value)
             obj.Xunfolded = value;
-            notify(obj,'dataUpdated');
+            %notify(obj,'dataUpdated');
+            obj.setDimensions;
         end
         function setDimensions(obj,~,~)
             obj.n_dims = ndims(obj.Xunfolded);
