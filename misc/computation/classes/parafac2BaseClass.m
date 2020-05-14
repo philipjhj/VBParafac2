@@ -56,7 +56,11 @@ classdef parafac2BaseClass < handle
             end
         end
         
-        function plts=plot_profiles(obj, include_scale, normalize, attempt_flip, colors)
+        function plts=plot_profiles(obj, include_scale, normalize, attempt_flip, colors, subplots)
+            
+            if nargin < 6
+                subplots=false;
+            end
             
             profiles=obj.compute_profiles(include_scale, normalize, attempt_flip);
             
@@ -66,14 +70,25 @@ classdef parafac2BaseClass < handle
             end
 %             disp(Ms)
 %             disp(obj.M)
-            for m = fliplr(Ms)
-%                 disp(m)
-                plts(:,m)=plot(squeeze(profiles(m,:,:)),'color',colors(m,:),'LineWidth',1.7);
-                
-               
-                hold on
+
+
+            
+            n_M=length(Ms);
+            if subplots
+                for m = fliplr(Ms)
+                        subplot(n_M,1,m)
+                        plts(:,m)=plot(squeeze(profiles(m,:,:)),'color',colors(m,:),'LineWidth',1.7);
+                end                
+            else
+                for m = fliplr(Ms)
+    %                 disp(m)
+                    plts(:,m)=plot(squeeze(profiles(m,:,:)),'color',colors(m,:),'LineWidth',1.7);
+
+
+                    hold on
+                end
+                hold off
             end
-            hold off
         end
     
         function [A, C, F, P, FPk] = normalize(obj)

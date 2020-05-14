@@ -12,7 +12,7 @@ FtPt(isnan(FtPt)) = 0;
 
 AScale = max(abs(A),[],1);
 A = bsxfun(@times,1./AScale,A);
-A(isnan(A))=0
+A(isnan(A))=0;
 
 C = C*diag(AScale).*permute(FtPtScale,[3 1 2]);
 
